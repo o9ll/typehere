@@ -136,6 +136,7 @@ input {
   margin: 0px 8px;
   transition: right .3s ease;
   z-index: 12;
+  -webkit-app-region: no-drag;
 }
 
 /* Add this new rule */
@@ -243,37 +244,226 @@ body.show-scrollbar #controls {
   font-style: italic;
 }
 
-.more-menu {
+/* ── Cmd-K palette ───────────────────────────────────────────────── */
+.cmdk-item {
   display: flex;
   flex-direction: column;
-  padding: 6px;
-  gap: 1px;
-  position: fixed;
-  z-index: 100;
-  background-color: var(--note-background-color);
-  border: 1px solid var(--border-color);
-  box-shadow: 0 8px 16px var(--box-shadow-color);
-  border-radius: 8px;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.08s ease;
 }
 
-.more-menu,
-.more-menu button {
+.cmdk-item[data-selected="true"] {
+  background: var(--hover-background-color);
+}
+
+.cmdk-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.cmdk-item-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
   color: var(--dark-color);
 }
 
-.more-menu button {
-  text-align: left;
-  border-radius: 5px;
-  border: none;
-  padding: 6px 12px;
+.cmdk-item-index {
+  color: var(--secondary-dark-color);
+  font-size: 0.72rem;
+  margin-right: 2px;
+}
+
+.cmdk-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--dark-color);
+  opacity: 0.5;
+  overflow: hidden;
+  flex-wrap: wrap;
+}
+
+.cmdk-delete-btn {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
   background: transparent;
-  transition: background-color 0.12s ease;
-  font-size: 0.9rem;
+  color: var(--dark-color);
+  cursor: pointer;
+  opacity: 0.5;
+  flex-shrink: 0;
+  transition: opacity 0.1s;
+}
+
+.cmdk-delete-btn:hover {
+  opacity: 1;
+  background: var(--delete-btn-background-color);
+  border-color: var(--delete-btn-background-color);
+  color: var(--on-fill-color);
+}
+
+.cmdk-action {
+  padding-left: 14px;
+}
+
+.cmdk-action-stripe {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 6px;
+  width: 2px;
+  border-radius: 3px;
+}
+
+.cmdk-enter-hint {
+  font-size: 0.7rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--hover-background-color);
+  color: var(--dark-color);
+  opacity: 0.6;
+  flex-shrink: 0;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.cmdk-footer {
+  font-size: 0.7rem;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border-color);
+  color: var(--dark-color);
+  opacity: 0.35;
+  text-align: right;
+}
+
+/* ── Shared panel / overlay primitives ───────────────────────────── */
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--overlay-background-color);
+}
+
+.ui-panel {
+  position: fixed;
+  z-index: 201;
+  background: var(--note-background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.ui-panel-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dark-color);
+  opacity: 0.5;
+}
+
+.ui-close-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 0.75rem;
+  color: var(--dark-color);
+  opacity: 0.4;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.ui-close-btn:hover {
+  opacity: 0.8;
+  background: var(--hover-background-color);
+}
+
+/* ── More menu ───────────────────────────────────────────────────── */
+.more-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  position: fixed;
+  z-index: 201;
+  background: var(--note-background-color);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  min-width: 168px;
+}
+
+.more-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  border-radius: 6px;
+  border: none;
+  padding: 5px 8px;
+  background: transparent;
+  transition: background-color 0.1s ease;
+  font-size: 0.78rem;
   white-space: nowrap;
+  color: var(--dark-color);
+  width: 100%;
+  cursor: pointer;
+  opacity: 0.85;
 }
 
 .more-menu button:hover {
   background-color: var(--hover-background-color);
+  opacity: 1;
+}
+
+.more-menu button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.more-menu-check {
+  width: 10px;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.more-menu-label {
+  flex: 1;
+}
+
+.more-menu-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 3px 0;
+  opacity: 0.4;
 }
 
 .more-menu a {
@@ -282,54 +472,112 @@ body.show-scrollbar #controls {
   width: 100%;
 }
 
-.more-menu a button {
-  width: 100%;
+/* ── Backup list modal ───────────────────────────────────────────── */
+.backup-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 12px;
 }
 
+.backup-list-row:last-child {
+  border-bottom: none;
+}
+
+.backup-list-label {
+  font-size: 0.78rem;
+  color: var(--dark-color);
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.backup-list-meta {
+  font-size: 0.72rem;
+  color: var(--dark-color);
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+
+.backup-restore-btn {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--dark-color);
+  cursor: pointer;
+  opacity: 0.6;
+  flex-shrink: 0;
+  transition: opacity 0.1s, background-color 0.1s;
+}
+
+.backup-restore-btn:hover {
+  opacity: 1;
+  background: var(--hover-background-color);
+}
+
+/* ── Help / shortcuts modal ──────────────────────────────────────── */
 .help-menu {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 6px;
+  border-radius: 10px;
   border: 1px solid var(--border-color);
-  max-height: 50vh;
-  overflow: auto;
+  max-height: 60vh;
+  overflow: hidden;
   position: fixed;
-  z-index: 11;
+  z-index: 201;
   top: 50%;
   left: 50%;
+  width: 320px;
+  max-width: calc(100vw - 32px);
   background: var(--note-background-color);
   transform: translate(-50%, -50%);
   color: var(--dark-color);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
 
 .help-menu-shortcuts {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  overflow-y: auto;
+  padding: 6px 0;
 }
 
 .help-menu-shortcuts-item {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   align-items: center;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  color: var(--dark-color);
+  opacity: 0.8;
+}
+
+.help-menu-shortcuts-item span:last-child {
+  margin-left: auto;
+  opacity: 0.5;
+  font-size: 0.72rem;
 }
 
 .help-menu-shortcuts-keys {
   display: flex;
   gap: 2px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .help-menu-shortcuts-keys kbd {
-  background-color: var(--keyboard-key-color);
-  color: var(--on-fill-color);
-  padding: 2px 4px;
+  background: var(--hover-background-color);
+  color: var(--dark-color);
+  border: 1px solid var(--border-color);
+  padding: 1px 5px;
   border-radius: 4px;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-  font-size: 0.85rem;
-  font-weight: bold;
+  font-size: 0.72rem;
+  font-weight: 600;
+  box-shadow: 0 1px 0 var(--border-color);
 }
 
 * button {

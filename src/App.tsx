@@ -8,6 +8,7 @@ import { FaMapPin } from "react-icons/fa";
 import { MdVisibilityOff } from "react-icons/md";
 import { FiMoreHorizontal } from "react-icons/fi";
 import isElectron from "is-electron";
+import type { BackupEntry } from "./electron.d";
 import "./App.css";
 
 const textsToReplace: [string | RegExp, string][] = [
@@ -452,144 +453,6 @@ const freshDatabase = [
   },
 ];
 
-async function backupDataToSafeLocation(data: Note[]): Promise<void> {
-  if (!("indexedDB" in window)) {
-    console.error("This browser doesn't support IndexedDB");
-    return;
-  }
-
-  const CHUNK_SIZE = 100; // Process notes in chunks of 100
-  const dbRequest = indexedDB.open("BackupDatabase", 1);
-
-  dbRequest.onupgradeneeded = (event) => {
-    const db = (event.target as IDBOpenDBRequest).result;
-    if (db.objectStoreNames.contains("backups")) {
-      db.deleteObjectStore("backups");
-    }
-    const store = db.createObjectStore("backups", { keyPath: "date" });
-    store.createIndex("dateIndex", "date", { unique: false });
-  };
-
-  return new Promise((resolve, reject) => {
-    dbRequest.onerror = () => {
-      console.error("Error opening IndexedDB for backup", dbRequest.error);
-      reject(dbRequest.error);
-    };
-
-    dbRequest.onsuccess = async () => {
-      const db = dbRequest.result;
-      try {
-        // Process cleanup in a separate transaction
-        const cleanupTx = db.transaction("backups", "readwrite");
-        const store = cleanupTx.objectStore("backups");
-
-        await new Promise<void>((resolve, reject) => {
-          const request = store.getAllKeys();
-          request.onsuccess = () => {
-            const keys = request.result as string[];
-            if (keys.length >= 5) {
-              // Sort keys by date and keep only the latest 4
-              keys
-                .sort()
-                .slice(0, -4)
-                .forEach((key) => {
-                  store.delete(key);
-                });
-            }
-            resolve();
-          };
-          request.onerror = () => reject(request.error);
-        });
-
-        // Process backup in chunks
-        const chunks = [];
-        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-          chunks.push(data.slice(i, i + CHUNK_SIZE));
-        }
-
-        const backupEntry: { date: string; data: Note[] } = {
-          date: new Date().toISOString(),
-          data: [],
-        };
-
-        // Process each chunk
-        for (const chunk of chunks) {
-          const processedChunk = chunk.map((note) => ({
-            ...note,
-            content: note.content.slice(0, 10000), // Limit content size
-          })) as Note[];
-          backupEntry.data.push(...processedChunk);
-        }
-
-        // Save the processed data
-        const tx = db.transaction("backups", "readwrite");
-        const backupStore = tx.objectStore("backups");
-
-        await new Promise<void>((resolve, reject) => {
-          const request = backupStore.put(backupEntry);
-          request.onerror = () => reject(request.error);
-          tx.oncomplete = () => resolve();
-        });
-      } catch (error) {
-        console.error("Error during backup:", error);
-        reject(error);
-      } finally {
-        db.close();
-      }
-      resolve();
-    };
-  });
-}
-
-// Currently unused - disabled to prevent memory issues
-// Can be re-enabled if memory performance is improved
-// @ts-expect-error - Kept for future use
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function usePeriodicBackup(data: Note[], interval: number = 24 * 60 * 60 * 1000): void {
-  useEffect(() => {
-    let isBackupInProgress = false;
-    let isMounted = true;
-    let timeoutId: number | undefined;
-
-    const performBackup = async () => {
-      if (isBackupInProgress || !isMounted) return;
-      isBackupInProgress = true;
-
-      try {
-        const lastBackupDateStr = localStorage.getItem("lastBackupDate");
-        const lastBackupDate = lastBackupDateStr ? new Date(lastBackupDateStr) : new Date(0);
-        const now = new Date();
-
-        if (now.getTime() - lastBackupDate.getTime() > interval) {
-          await backupDataToSafeLocation(data);
-          if (isMounted) {
-            localStorage.setItem("lastBackupDate", new Date().toISOString());
-          }
-        }
-      } catch (error) {
-        console.error("Backup failed:", error);
-      } finally {
-        isBackupInProgress = false;
-      }
-    };
-
-    const scheduleNextBackup = () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(async () => {
-        await performBackup();
-        if (isMounted) scheduleNextBackup();
-      }, interval);
-    };
-
-    performBackup();
-    scheduleNextBackup();
-
-    return () => {
-      isMounted = false;
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, [data, interval]);
-}
 
 const themeId = "typehere-theme";
 if (localStorage.getItem(themeId) === '"dark"') {
@@ -711,6 +574,11 @@ const snippets: Snippet[] = [
     getValue: getCurrentTime,
   },
   {
+    name: "now",
+    description: "Insert current date and time",
+    getValue: getCurrentTime,
+  },
+  {
     name: "date",
     description: "Insert current date",
     getValue: getCurrentDate,
@@ -751,9 +619,6 @@ function App() {
   }, []);
 
   const [database, setDatabase] = usePersistentState<Note[]>("typehere-database", freshDatabase);
-
-  // Auto backup disabled to prevent memory issues
-  // usePeriodicBackup(database);
 
   const [currentWorkspace, setCurrentWorkspace] = usePersistentState<string | null>(
     "typehere-currentWorkspace",
@@ -949,9 +814,6 @@ function App() {
     []
   );
   const [shouldShowHiddenNotes, setShouldShowHiddenNotes] = useState(false);
-
-  // Auto backup disabled to prevent memory issues
-  // usePeriodicBackup(deletedNotesBackup);
 
   const toggleTheme = () => {
     const newTheme = currentTheme === "light" ? "dark" : "light";
@@ -1214,10 +1076,10 @@ function App() {
         {
           type: "action",
           title: "backup all notes",
-          content: "to indexedDb",
-          color: "#FFEB3B", // A soothing yellow
+          content: "to cloud",
+          color: "#FFEB3B",
           onAction: () => {
-            backupDataToSafeLocation(database);
+            createCloudBackup();
             return true;
           },
         },
@@ -1739,6 +1601,7 @@ function App() {
       editor.resize();
 
       const snippetCompleter = {
+        identifierRegexps: [/[/\w]/],
         getCompletions: (
           _editor: unknown,
           session: { getLine: (row: number) => string },
@@ -1751,8 +1614,9 @@ function App() {
         ) => {
           const line = session.getLine(pos.row);
           const beforeCursor = line.substring(0, pos.column);
+          const hasSlash = beforeCursor.startsWith("/");
+          const searchTerm = (hasSlash ? beforeCursor.substring(1) : beforeCursor).toLowerCase();
 
-          const searchTerm = beforeCursor.substring(1).toLowerCase();
           const completions = snippets
             .filter((snippet) => snippet.name.toLowerCase().startsWith(searchTerm))
             .map((snippet) => ({
@@ -1772,6 +1636,7 @@ function App() {
         enableSnippets: true,
         enableLiveAutocompletion: true,
       });
+
     }
   }, []);
 
@@ -1795,6 +1660,47 @@ function App() {
 
   const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
   const cmdKey = isMac ? "⌘" : "ctrl";
+
+  const [isBackupListOpen, setIsBackupListOpen] = useState(false);
+  const [backupList, setBackupList] = useState<BackupEntry[]>([]);
+  const [backupStatus, setBackupStatus] = useState<"idle" | "backing-up" | "done" | "error">("idle");
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+
+  const isBackingUp = backupStatus === "backing-up";
+
+  const createCloudBackup = async () => {
+    if (!window.electronBackup || isBackingUp) return;
+    setBackupStatus("backing-up");
+    try {
+      await window.electronBackup.create(JSON.stringify(database));
+      setBackupStatus("done");
+      setTimeout(() => setBackupStatus("idle"), 3000);
+    } catch {
+      setBackupStatus("error");
+      setTimeout(() => setBackupStatus("idle"), 4000);
+    }
+  };
+
+  const openBackupList = async () => {
+    if (!window.electronBackup) return;
+    setIsBackupListOpen(true);
+    setIsLoadingBackups(true);
+    try {
+      const entries = await window.electronBackup.list();
+      setBackupList(entries);
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  };
+
+  const restoreBackup = async (key: string) => {
+    if (!window.electronBackup) return;
+    const notesJson = await window.electronBackup.restore(key);
+    const notes = JSON.parse(notesJson);
+    setDatabase(notes);
+    setCurrentWorkspace(null);
+    setIsBackupListOpen(false);
+  };
 
   const exportDatabase = async () => {
     const compressedData = LZString.compressToEncodedURIComponent(JSON.stringify(database));
@@ -1935,28 +1841,26 @@ function App() {
               gap: "4px",
             }}
           >
+            {backupStatus !== "idle" && (
+              <>
+                <span style={backupStatus === "error" ? { color: "var(--red-color, #e05252)" } : undefined}>
+                  {backupStatus === "backing-up" ? "backing up..." : backupStatus === "done" ? "backed up" : "backup failed"}
+                </span>
+                {currentWorkspace && <span>·</span>}
+              </>
+            )}
             {currentWorkspace && <span>[{currentWorkspace}]</span>}
             <span>[{currentTime}]</span>
           </div>
           {isHelpMenuOpen &&
             createPortal(
               <>
-                <div
-                  style={{
-                    width: "100vw",
-                    height: "100vh",
-                    position: "fixed",
-                    background: "var(--overlay-background-color)",
-                    top: 0,
-                    left: 0,
-                    zIndex: 10,
-                  }}
-                  onClick={() => {
-                    setIsHelpMenuOpen(false);
-                  }}
-                />
+                <div className="ui-overlay" onClick={() => setIsHelpMenuOpen(false)} />
                 <div className="help-menu">
-                  <h3>Keyboard Shortcuts</h3>
+                  <div className="ui-panel-header">
+                    <span className="ui-panel-title">Keyboard Shortcuts</span>
+                    <button className="ui-close-btn" onClick={() => setIsHelpMenuOpen(false)}>esc</button>
+                  </div>
                   <div className="help-menu-shortcuts">
                     <div className="help-menu-shortcuts-item">
                       <div className="help-menu-shortcuts-keys">
@@ -1985,9 +1889,6 @@ function App() {
                       <div className="help-menu-shortcuts-keys">
                         <kbd>{cmdKey}</kbd>
                         <kbd>j/k</kbd>
-                      </div>
-                      or
-                      <div className="help-menu-shortcuts-keys">
                         <kbd>↑/↓</kbd>
                       </div>
                       <span>Navigation</span>
@@ -2020,7 +1921,6 @@ function App() {
                       <span>Pin note to all workspaces</span>
                     </div>
                   </div>
-                  <button onClick={() => setIsHelpMenuOpen(false)}>close</button>
                 </div>
               </>,
               document.body
@@ -2061,79 +1961,78 @@ function App() {
                 }}
                 className="more-menu"
               >
+                <button onClick={() => setIsUsingVim(!isUsingVim)}>
+                  <span className="more-menu-check">{isUsingVim ? "✓" : ""}</span>
+                  <span className="more-menu-label">vim mode</span>
+                </button>
+                <button onClick={() => toggleTheme()}>
+                  <span className="more-menu-check">{currentTheme === "dark" ? "✓" : ""}</span>
+                  <span className="more-menu-label">dark mode</span>
+                </button>
+                <div className="more-menu-divider" />
                 <button
                   onClick={() => {
                     setMoreMenuPosition(null);
-                    setIsUsingVim(!isUsingVim);
+                    createCloudBackup();
                   }}
+                  disabled={isBackingUp}
                 >
-                  {isUsingVim ? "no vim" : "vim"}
+                  <span className="more-menu-check" />
+                  <span className="more-menu-label">{isBackingUp ? "backing up..." : "backup"}</span>
                 </button>
                 <button
                   onClick={() => {
                     setMoreMenuPosition(null);
-                    toggleTheme();
+                    openBackupList();
                   }}
                 >
-                  {currentTheme === "light" ? "dark" : "light"}
+                  <span className="more-menu-check" />
+                  <span className="more-menu-label">backups</span>
                 </button>
                 <button
-                  onClick={() => {
-                    setMoreMenuPosition(null);
-                    backupDataToSafeLocation(database);
-                  }}
-                >
-                  backup
-                </button>
-                <button
-                  tabIndex={-1}
                   onClick={() => {
                     setMoreMenuPosition(null);
                     exportDatabase();
                   }}
                 >
-                  export
+                  <span className="more-menu-check" />
+                  <span className="more-menu-label">export</span>
                 </button>
                 <button
-                  tabIndex={-1}
                   onClick={() => {
                     setMoreMenuPosition(null);
                     fileInputDomRef.current?.click();
                   }}
                 >
-                  import
+                  <span className="more-menu-check" />
+                  <span className="more-menu-label">import</span>
                 </button>
                 {textValue && (
                   <button
-                    tabIndex={-1}
                     onClick={() => {
                       setMoreMenuPosition(null);
                       openNewNote("");
                     }}
                   >
-                    new
+                    <span className="more-menu-check" />
+                    <span className="more-menu-label">new note</span>
                   </button>
                 )}
-                <div
-                  style={{
-                    height: "1px",
-                    width: "100%",
-                    backgroundColor: "var(--border-color)",
-                    margin: "4px 6px",
-                    opacity: 0.5,
-                  }}
-                />
+                <div className="more-menu-divider" />
                 <a href="https://github.com/shaoruu/typehere.app" target="_blank" rel="noreferrer">
-                  <button tabIndex={-1}>github</button>
+                  <button>
+                    <span className="more-menu-check" />
+                    <span className="more-menu-label">github</span>
+                  </button>
                 </a>
                 <button
-                  tabIndex={-1}
                   onClick={() => {
                     setMoreMenuPosition(null);
                     setIsHelpMenuOpen(true);
                   }}
                 >
-                  how
+                  <span className="more-menu-check" />
+                  <span className="more-menu-label">shortcuts</span>
                 </button>
               </div>
             </>
@@ -2143,65 +2042,50 @@ function App() {
           createPortal(
             <>
               <div
-                style={{
-                  backgroundColor: "var(--overlay-background-color)",
-                  position: "fixed",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 99,
-                }}
-                onClick={() => {
-                  setIsCmdKMenuOpen(false);
-                }}
+                className="ui-overlay"
+                style={{ zIndex: 200 }}
+                onClick={() => setIsCmdKMenuOpen(false)}
               />
               <div
+                className="ui-panel"
                 style={{
-                  zIndex: 100,
-                  position: "fixed",
-                  top: "25%",
+                  zIndex: 201,
+                  top: "22%",
                   left: "50%",
-                  width: "360px",
+                  width: "380px",
                   maxWidth: "calc(100vw - 32px)",
                   transform: "translateX(-50%)",
-                  backgroundColor: "var(--note-background-color)",
-                  boxShadow: "0 8px 16px var(--box-shadow-color)",
-                  display: "flex",
-                  flexDirection: "column",
-                  borderRadius: 8,
-                  border: "1px solid var(--border-color)",
                 }}
               >
                 <input
                   autoFocus
                   ref={cmdKInputDomRef}
-                  placeholder="Search for note"
+                  placeholder="Search notes..."
                   value={cmdKSearchQuery}
                   onChange={(e) => {
                     setCmdKSearchQuery(e.target.value);
                     setSelectedCmdKSuggestionIndex(0);
                   }}
                   style={{
-                    padding: "8px 10px",
+                    padding: "10px 14px",
                     outline: "none",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: 6,
-                    margin: "8px",
-                    marginBottom: 6,
-                    fontSize: "0.95rem",
+                    border: "none",
+                    borderBottom: "1px solid var(--border-color)",
+                    borderRadius: 0,
+                    fontSize: "0.85rem",
+                    background: "transparent",
+                    color: "var(--dark-color)",
+                    width: "100%",
                   }}
                 />
                 <div
-                  className="notes-list no-scrollbar"
+                  className="no-scrollbar"
                   style={{
                     maxHeight: "min(320px, 40vh)",
-                    overflow: "auto",
+                    overflowY: "auto",
                     display: "flex",
-                    border: "none",
                     flexDirection: "column",
-                    gap: 4,
-                    padding: "4px 8px 8px 8px",
+                    padding: "4px",
                   }}
                 >
                   {cmdKSuggestions.map((suggestion, index) => {
@@ -2216,103 +2100,48 @@ function App() {
                         <div
                           key={`note-${note.id}-${index}`}
                           id={`note-list-cmdk-item-${index}`}
-                          className="note-list-item"
-                          onClick={() => {
-                            openNote(note.id);
-                          }}
-                          style={{
-                            backgroundColor:
-                              index === selectedCmdKSuggestionIndex
-                                ? "var(--note-selected-background-color)"
-                                : "var(--note-background-color)",
-                          }}
+                          className="cmdk-item"
+                          onClick={() => openNote(note.id)}
+                          data-selected={index === selectedCmdKSuggestionIndex}
                         >
-                          <div className="note-list-item-top">
-                            <div
-                              className="note-list-item-title"
+                          <div className="cmdk-item-main">
+                            <span
+                              className="cmdk-item-title"
                               style={{
-                                fontWeight: note.id === currentNoteId ? "bold" : "normal",
+                                fontWeight: note.id === currentNoteId ? 600 : undefined,
                                 fontStyle: title ? "normal" : "italic",
-                                color: title
-                                  ? "var(--dark-color)"
-                                  : "var(--untitled-note-title-color)",
+                                color: title ? "var(--dark-color)" : "var(--untitled-note-title-color)",
                               }}
                             >
                               {isAltKeyDown && index + 1 <= digitCount && (
-                                <div
-                                  style={{
-                                    display: "inline-block",
-                                    color: "var(--secondary-dark-color)",
-                                    marginRight: "4px",
-                                    fontSize: "0.8rem",
-                                  }}
-                                >
-                                  {index + 1}
-                                </div>
+                                <span className="cmdk-item-index">{index + 1}</span>
                               )}
                               {note.isHidden && (
-                                <MdVisibilityOff
-                                  style={{
-                                    color: "var(--hidden-color)",
-                                    marginRight: "4px",
-                                    fontSize: "0.8rem",
-                                  }}
-                                />
+                                <MdVisibilityOff style={{ color: "var(--hidden-color)", marginRight: 3, fontSize: "0.8rem" }} />
                               )}
                               {note.isPinned && (
-                                <FaMapPin
-                                  style={{
-                                    marginRight: "4px",
-                                    color: "var(--pin-color)",
-                                    fontSize: "0.8rem",
-                                  }}
-                                />
+                                <FaMapPin style={{ marginRight: 3, color: "var(--pin-color)", fontSize: "0.75rem" }} />
                               )}
-                              <span>{title.trim() || "New Note"}</span>
-                            </div>
+                              {title.trim() || "New Note"}
+                            </span>
                             <button
-                              className="note-list-item-delete-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteNote(note.id);
-                              }}
+                              className="cmdk-delete-btn"
+                              onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
                               style={{
-                                visibility:
-                                  workspaceNotes.length > 1 && index === selectedCmdKSuggestionIndex
-                                    ? "visible"
-                                    : "hidden",
-                                pointerEvents:
-                                  workspaceNotes.length > 1 && index === selectedCmdKSuggestionIndex
-                                    ? "auto"
-                                    : "none",
+                                visibility: workspaceNotes.length > 1 && index === selectedCmdKSuggestionIndex ? "visible" : "hidden",
+                                pointerEvents: workspaceNotes.length > 1 && index === selectedCmdKSuggestionIndex ? "auto" : "none",
                               }}
                             >
-                              Delete
+                              delete
                             </button>
                           </div>
-                          <div
-                            className="note-list-item-timestamp"
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              flexDirection: "row",
-                              flexWrap: "wrap",
-                            }}
-                          >
+                          <div className="cmdk-item-meta">
                             {note.workspace && (
                               <>
-                                <span
-                                  style={{
-                                    overflow: "hidden",
-                                    whiteSpace: "nowrap",
-                                    textOverflow: "ellipsis",
-                                    direction: "rtl",
-                                  }}
-                                >
+                                <span style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", direction: "rtl" }}>
                                   {note.workspace}
                                 </span>
-                                <span>•</span>
+                                <span>·</span>
                               </>
                             )}
                             {showBothDates ? (
@@ -2329,104 +2158,41 @@ function App() {
                       );
                     }
 
-                    const { title, onAction, content, color } = suggestion;
+                    const { title, onAction, color } = suggestion;
 
                     return (
                       <div
                         key={`action-${title}-${index}`}
                         id={`note-list-cmdk-item-${index}`}
-                        className="note-list-item"
+                        className="cmdk-item cmdk-action"
                         onClick={onAction}
-                        style={{
-                          backgroundColor:
-                            index === selectedCmdKSuggestionIndex
-                              ? "var(--note-selected-background-color)"
-                              : "var(--note-background-color)",
-                          position: "relative",
-                        }}
+                        data-selected={index === selectedCmdKSuggestionIndex}
+                        style={{ position: "relative" }}
                       >
                         {color && (
                           <div
+                            className="cmdk-action-stripe"
                             style={{
-                              top: 2,
-                              bottom: 2,
-                              left: 0,
-                              width: 3,
-                              borderRadius: 4,
-                              position: "absolute",
                               background: color,
-                              opacity: index === selectedCmdKSuggestionIndex ? 1.0 : 0.5,
+                              opacity: index === selectedCmdKSuggestionIndex ? 1 : 0.4,
                             }}
-                          ></div>
+                          />
                         )}
-                        <div className="note-list-item-top">
-                          <div
-                            className="note-list-item-title"
-                            style={{
-                              fontWeight: "normal",
-                              fontStyle: "normal",
-                              color: "var(--dark-color)",
-                            }}
+                        <div className="cmdk-item-main">
+                          <span className="cmdk-item-title">{title}</span>
+                          <kbd
+                            className="cmdk-enter-hint"
+                            style={{ visibility: index === selectedCmdKSuggestionIndex ? "visible" : "hidden" }}
                           >
-                            {title}
-                          </div>
-                          <p
-                            style={{
-                              marginLeft: "4px",
-                              fontSize: "0.8rem",
-                              display: "flex",
-                              alignItems: "center",
-                              padding: "1px 4px",
-                              borderRadius: "4px",
-                              cursor: "pointer",
-                              color: "var(--on-fill-color)",
-                              background: "var(--keyboard-key-color)",
-                              borderRight: "2px solid var(--border-color)",
-                              borderBottom: "2px solid var(--border-color)",
-                              borderLeft: "none",
-                              borderTop: "none",
-                              visibility:
-                                index === selectedCmdKSuggestionIndex ? "visible" : "hidden",
-                            }}
-                          >
-                            Enter{" "}
-                            <span
-                              style={{
-                                marginLeft: "4px",
-                                marginBottom: "1px",
-                              }}
-                            >
-                              ↵
-                            </span>
-                          </p>
-                        </div>
-                        <div
-                          className="note-list-item-timestamp"
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <p>{content}</p>
+                            ↵
+                          </kbd>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <div
-                  style={{
-                    outline: "none",
-                    padding: "6px 12px",
-                    fontSize: "0.75rem",
-                    borderTop: "1px solid var(--border-color)",
-                    color: "var(--dark-color)",
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    opacity: 0.5,
-                  }}
-                >
-                  {currentWorkspace ? `workspace: [${currentWorkspace}]` : `all notes`}
+                <div className="cmdk-footer">
+                  {currentWorkspace ? `[${currentWorkspace}]` : "all notes"}
                 </div>
               </div>
             </>,
@@ -2453,6 +2219,50 @@ function App() {
             };
           }}
         />
+        {isBackupListOpen &&
+          createPortal(
+            <>
+              <div className="ui-overlay" onClick={() => setIsBackupListOpen(false)} />
+              <div
+                className="ui-panel"
+                style={{
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: "380px",
+                  maxWidth: "calc(100vw - 32px)",
+                  maxHeight: "60vh",
+                }}
+              >
+                <div className="ui-panel-header">
+                  <span className="ui-panel-title">Cloud Backups</span>
+                  <button className="ui-close-btn" onClick={() => setIsBackupListOpen(false)}>esc</button>
+                </div>
+                <div className="no-scrollbar" style={{ overflowY: "auto", flex: 1 }}>
+                  {isLoadingBackups ? (
+                    <div className="backup-list-row" style={{ justifyContent: "center", padding: "20px" }}>
+                      <span className="backup-list-meta">loading...</span>
+                    </div>
+                  ) : backupList.length === 0 ? (
+                    <div className="backup-list-row" style={{ justifyContent: "center", padding: "20px" }}>
+                      <span className="backup-list-meta">no backups yet</span>
+                    </div>
+                  ) : (
+                    backupList.map((entry) => (
+                      <div key={entry.key} className="backup-list-row">
+                        <span className="backup-list-label">{entry.label}</span>
+                        <span className="backup-list-meta">{(entry.size / 1024).toFixed(1)}kb</span>
+                        <button className="backup-restore-btn" onClick={() => restoreBackup(entry.key)}>
+                          restore
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>,
+            document.body
+          )}
       </main>
     </>
   );

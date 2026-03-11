@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld("ipcRenderer", {
 });
 
 
+contextBridge.exposeInMainWorld("electronBackup", {
+  create: (notesJson: string) => ipcRenderer.invoke("backup:create", notesJson),
+  list: () => ipcRenderer.invoke("backup:list"),
+  restore: (key: string) => ipcRenderer.invoke("backup:restore", key),
+});
+
 // --------- Preload scripts loading ---------
 function domReady(condition: DocumentReadyState[] = ["complete", "interactive"]) {
   return new Promise((resolve) => {

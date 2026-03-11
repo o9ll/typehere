@@ -2,7 +2,10 @@ import { app, BrowserWindow, shell, ipcMain } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
 import Store from "electron-store";
+import { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import dotenv from "dotenv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,6 +20,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // │ └── index.html    > Electron-Renderer
 //
 process.env.APP_ROOT = path.join(__dirname, "../..");
+
+const envPath = process.env.VITE_DEV_SERVER_URL
+  ? path.join(process.env.APP_ROOT, ".env")
+  : path.join(process.resourcesPath, ".env");
+dotenv.config({ path: envPath });
 
 export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
@@ -150,5 +158,119 @@ ipcMain.handle("open-win", (_, arg) => {
   } else {
     childWindow.loadFile(indexHtml, { hash: arg });
   }
+});
+
+interface AppStore {
+  backupKey?: string;
+}
+
+const appStore = new Store<AppStore>({ name: "typehere-app" });
+
+function getBackupEncryptionKey(): Buffer {
+  let key = appStore.get("backupKey");
+  if (!key) {
+    key = crypto.randomBytes(32).toString("hex");
+    appStore.set("backupKey", key);
+  }
+  return Buffer.from(key, "hex");
+}
+
+function encryptBackup(plaintext: string): Buffer {
+  const key = getBackupEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([iv, authTag, encrypted]);
+}
+
+function decryptBackup(data: Buffer): string {
+  const key = getBackupEncryptionKey();
+  const iv = data.subarray(0, 12);
+  const authTag = data.subarray(12, 28);
+  const encrypted = data.subarray(28);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(authTag);
+  return decipher.update(encrypted) + decipher.final("utf8");
+}
+
+function getR2Client(): S3Client {
+  return new S3Client({
+    region: "auto",
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    },
+  });
+}
+
+const BACKUP_PREFIX = "backups/";
+
+export interface BackupEntry {
+  key: string;
+  label: string;
+  size: number;
+  lastModified: string;
+}
+
+ipcMain.handle("backup:create", async (_, notesJson: string) => {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const label = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const key = `${BACKUP_PREFIX}${label}.bin`;
+
+  const encrypted = encryptBackup(notesJson);
+
+  const client = getR2Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+      Body: encrypted,
+      ContentType: "application/octet-stream",
+    })
+  );
+
+  return { key, label };
+});
+
+ipcMain.handle("backup:list", async () => {
+  const client = getR2Client();
+  const response = await client.send(
+    new ListObjectsV2Command({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Prefix: BACKUP_PREFIX,
+    })
+  );
+
+  const entries: BackupEntry[] = (response.Contents ?? [])
+    .filter((obj) => obj.Key && obj.Key !== BACKUP_PREFIX)
+    .map((obj) => ({
+      key: obj.Key!,
+      label: obj.Key!.replace(BACKUP_PREFIX, "").replace(".bin", ""),
+      size: obj.Size ?? 0,
+      lastModified: obj.LastModified?.toISOString() ?? "",
+    }))
+    .sort((a, b) => b.label.localeCompare(a.label));
+
+  return entries;
+});
+
+ipcMain.handle("backup:restore", async (_, key: string) => {
+  const client = getR2Client();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+    })
+  );
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const data = Buffer.concat(chunks);
+  return decryptBackup(data);
 });
 
