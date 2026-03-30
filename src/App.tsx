@@ -699,6 +699,7 @@ function App() {
   const [shouldShowHiddenNotes, setShouldShowHiddenNotes] = useState(false);
 
   const themeBeforePreviewRef = useRef<string | null>(null);
+  const isSuppressingMousePreviewRef = useRef(false);
 
   const saveTheme = (id: string) => {
     setCurrentThemeId(id);
@@ -924,6 +925,7 @@ function App() {
           color: currentTheme.accentColor,
           onAction: () => {
             setIsThemePickerOpen(true);
+            isSuppressingMousePreviewRef.current = true;
             setCmdKSearchQuery("");
             const idx = THEMES.findIndex((t) => t.id === currentThemeId);
             setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
@@ -2027,6 +2029,7 @@ function App() {
                   setMoreMenuPosition(null);
                   setIsCmdKMenuOpen(true);
                   setIsThemePickerOpen(true);
+                  isSuppressingMousePreviewRef.current = true;
                   setCmdKSearchQuery("");
                   const idx = THEMES.findIndex((t) => t.id === currentThemeId);
                   setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
@@ -2148,6 +2151,9 @@ function App() {
                 />
                 <div
                   className="no-scrollbar"
+                  onMouseMove={() => {
+                    isSuppressingMousePreviewRef.current = false;
+                  }}
                   style={{
                     maxHeight: "min(320px, 40vh)",
                     overflowY: "auto",
@@ -2171,6 +2177,7 @@ function App() {
                           className="cmdk-item"
                           onClick={() => openNote(note.id)}
                           onMouseEnter={() => {
+                            if (isSuppressingMousePreviewRef.current) return;
                             setSelectedCmdKSuggestionIndex(index);
                             previewThemeForSuggestion(suggestion);
                           }}
@@ -2244,6 +2251,7 @@ function App() {
                           }
                         }}
                         onMouseEnter={() => {
+                          if (isSuppressingMousePreviewRef.current) return;
                           setSelectedCmdKSuggestionIndex(index);
                           previewThemeForSuggestion(suggestion);
                         }}
