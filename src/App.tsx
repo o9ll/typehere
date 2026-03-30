@@ -826,6 +826,17 @@ function App() {
     applyThemeToDocument(getThemeById(id));
   };
 
+  const previewThemeForSuggestion = (suggestion?: CmdKSuggestion) => {
+    if (suggestion?.type === "action" && suggestion.themeId) {
+      if (themeBeforePreviewRef.current === null) {
+        themeBeforePreviewRef.current = currentThemeId;
+      }
+      applyThemeToDocument(getThemeById(suggestion.themeId), true);
+    } else if (themeBeforePreviewRef.current !== null) {
+      applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
+    }
+  };
+
   useEffect(() => {
     applyThemeToDocument(currentTheme);
   }, [currentThemeId]);
@@ -1388,15 +1399,7 @@ function App() {
           if (element) {
             element.scrollIntoView({ block: "center" });
           }
-          const nextSuggestion = cmdKSuggestions[nextIndex];
-          if (nextSuggestion?.type === "action" && nextSuggestion.themeId) {
-            if (themeBeforePreviewRef.current === null) {
-              themeBeforePreviewRef.current = currentThemeId;
-            }
-            applyThemeToDocument(getThemeById(nextSuggestion.themeId), true);
-          } else if (themeBeforePreviewRef.current !== null) {
-            applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
-          }
+          previewThemeForSuggestion(cmdKSuggestions[nextIndex]);
           return;
         }
 
@@ -1804,6 +1807,7 @@ function App() {
           }}
         >
           <AceEditor
+            mode="markdown"
             theme={currentTheme.isDark ? "clouds_midnight" : "clouds"}
             ref={aceEditorRef}
             value={textValue}
@@ -2124,6 +2128,10 @@ function App() {
                           id={`note-list-cmdk-item-${index}`}
                           className="cmdk-item"
                           onClick={() => openNote(note.id)}
+                          onMouseEnter={() => {
+                            setSelectedCmdKSuggestionIndex(index);
+                            previewThemeForSuggestion(suggestion);
+                          }}
                           data-selected={index === selectedCmdKSuggestionIndex}
                         >
                           <div className="cmdk-item-main">
@@ -2180,14 +2188,23 @@ function App() {
                       );
                     }
 
-                    const { title, onAction, color } = suggestion;
+                    const { title, color } = suggestion;
 
                     return (
                       <div
                         key={`action-${title}-${index}`}
                         id={`note-list-cmdk-item-${index}`}
                         className="cmdk-item cmdk-action"
-                        onClick={onAction}
+                        onClick={() => {
+                          if (runCmdKSuggestion(suggestion)) {
+                            setIsCmdKMenuOpen(false);
+                            setSelectedCmdKSuggestionIndex(0);
+                          }
+                        }}
+                        onMouseEnter={() => {
+                          setSelectedCmdKSuggestionIndex(index);
+                          previewThemeForSuggestion(suggestion);
+                        }}
                         data-selected={index === selectedCmdKSuggestionIndex}
                         style={{ position: "relative" }}
                       >
