@@ -121,6 +121,25 @@ async function createWindow() {
 
 app.whenReady().then(createWindow);
 
+const QUIT_BACKUP_TIMEOUT_MS = 10_000;
+let isQuitting = false;
+
+app.on("before-quit", (e) => {
+  if (isQuitting) return;
+  if (!win) return;
+  e.preventDefault();
+  win.webContents.send("backup-before-quit");
+  setTimeout(() => {
+    isQuitting = true;
+    app.quit();
+  }, QUIT_BACKUP_TIMEOUT_MS);
+});
+
+ipcMain.on("quit-ready", () => {
+  isQuitting = true;
+  app.quit();
+});
+
 app.on("window-all-closed", () => {
   win = null;
   if (process.platform !== "darwin") app.quit();
@@ -205,7 +224,27 @@ function getR2Client(): S3Client {
   });
 }
 
+function encryptBuffer(data: Buffer): Buffer {
+  const key = getBackupEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([iv, authTag, encrypted]);
+}
+
+function decryptBuffer(data: Buffer): Buffer {
+  const key = getBackupEncryptionKey();
+  const iv = data.subarray(0, 12);
+  const authTag = data.subarray(12, 28);
+  const encrypted = data.subarray(28);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]);
+}
+
 const BACKUP_PREFIX = "backups/";
+const ASSET_PREFIX = "assets/";
 
 export interface BackupEntry {
   key: string;
@@ -274,3 +313,34 @@ ipcMain.handle("backup:restore", async (_, key: string) => {
   return decryptBackup(data);
 });
 
+ipcMain.handle("asset:upload", async (_, id: string, base64Data: string) => {
+  const raw = Buffer.from(base64Data, "base64");
+  const encrypted = encryptBuffer(raw);
+  const client = getR2Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: `${ASSET_PREFIX}${id}.bin`,
+      Body: encrypted,
+      ContentType: "application/octet-stream",
+    })
+  );
+});
+
+ipcMain.handle("asset:download", async (_, id: string) => {
+  const client = getR2Client();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: `${ASSET_PREFIX}${id}.bin`,
+    })
+  );
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(Buffer.from(chunk));
+  }
+  const encrypted = Buffer.concat(chunks);
+  const decrypted = decryptBuffer(encrypted);
+  return decrypted.toString("base64");
+});

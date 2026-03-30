@@ -25,6 +25,17 @@ contextBridge.exposeInMainWorld("electronBackup", {
   create: (notesJson: string) => ipcRenderer.invoke("backup:create", notesJson),
   list: () => ipcRenderer.invoke("backup:list"),
   restore: (key: string) => ipcRenderer.invoke("backup:restore", key),
+  onBeforeQuit: (callback: () => void) => {
+    ipcRenderer.on("backup-before-quit", callback);
+  },
+  offBeforeQuit: (callback: () => void) => {
+    ipcRenderer.off("backup-before-quit", callback);
+  },
+  sendQuitReady: () => {
+    ipcRenderer.send("quit-ready");
+  },
+  uploadAsset: (id: string, base64Data: string) => ipcRenderer.invoke("asset:upload", id, base64Data),
+  downloadAsset: (id: string) => ipcRenderer.invoke("asset:download", id) as Promise<string>,
 });
 
 // --------- Preload scripts loading ---------

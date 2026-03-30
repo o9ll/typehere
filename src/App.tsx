@@ -10,7 +10,7 @@ import { FiMoreHorizontal } from "react-icons/fi";
 import isElectron from "is-electron";
 import type { BackupEntry } from "./electron.d";
 import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById } from "./themes";
-import { saveAsset, generateAssetId, formatImageRef } from "./assets";
+import { saveAsset, getAsset, generateAssetId, formatImageRef, restoreSerializedAssets, type SerializedAsset, uploadAssetToCloud, downloadAssetFromCloud, type AssetManifestEntry, IMAGE_REF_REGEX } from "./assets";
 import { ImageWidgetManager } from "./imageWidgets";
 import ImageSpotlight from "./ImageSpotlight";
 import "./App.css";
@@ -492,6 +492,8 @@ function App() {
   }, []);
 
   const [database, setDatabase] = usePersistentState<Note[]>("typehere-database", freshDatabase);
+  const databaseRef = useRef(database);
+  databaseRef.current = database;
 
   const [currentWorkspace, setCurrentWorkspace] = usePersistentState<string | null>(
     "typehere-currentWorkspace",
@@ -577,10 +579,10 @@ function App() {
 
   useEffect(() => {
     const manager = imageWidgetManagerRef.current;
-    if (manager) {
-      manager.clear();
-      requestAnimationFrame(() => manager.sync());
-    }
+    if (!manager) return;
+    manager.clear();
+    const id = setTimeout(() => manager.sync(), 50);
+    return () => clearTimeout(id);
   }, [currentNoteId]);
 
   const focus = () => {
@@ -1631,6 +1633,7 @@ function App() {
 
           const assetId = generateAssetId();
           await saveAsset(assetId, currentNoteIdRef.current ?? "", file, file.type, file.name);
+          uploadAssetToCloud(assetId).catch(() => {});
 
           const cursor = editor.getCursorPosition();
           editor.session.insert(cursor, formatImageRef(assetId));
@@ -1649,6 +1652,7 @@ function App() {
           e.preventDefault();
           const assetId = generateAssetId();
           await saveAsset(assetId, currentNoteIdRef.current ?? "", file, file.type, file.name || "pasted-image");
+          uploadAssetToCloud(assetId).catch(() => {});
 
           const cursor = editor.getCursorPosition();
           editor.session.insert(cursor, formatImageRef(assetId));
@@ -1702,11 +1706,35 @@ function App() {
 
   const isBackingUp = backupStatus === "backing-up";
 
+  const buildBackupPayload = async (notes: Note[]): Promise<string> => {
+    const allContent = notes.map((n) => n.content).join("\n");
+    const regex = new RegExp(IMAGE_REF_REGEX.source, "g");
+    const referencedIds = new Set<string>();
+    let match;
+    while ((match = regex.exec(allContent)) !== null) {
+      referencedIds.add(match[1]);
+    }
+
+    for (const id of referencedIds) {
+      try { await uploadAssetToCloud(id); } catch { /* best effort */ }
+    }
+
+    const assetManifest: AssetManifestEntry[] = [];
+    for (const id of referencedIds) {
+      const asset = await getAsset(id);
+      if (asset) {
+        assetManifest.push({ id: asset.id, noteId: asset.noteId, mimeType: asset.mimeType, name: asset.name });
+      }
+    }
+
+    return JSON.stringify({ version: 3, notes, assetManifest });
+  };
+
   const createCloudBackup = async () => {
     if (!window.electronBackup || isBackingUp) return;
     setBackupStatus("backing-up");
     try {
-      await window.electronBackup.create(JSON.stringify(database));
+      await window.electronBackup.create(await buildBackupPayload(database));
       setBackupStatus("done");
       localStorage.setItem("typehere-last-auto-backup", Date.now().toString());
       setTimeout(() => setBackupStatus("idle"), 3000);
@@ -1728,11 +1756,33 @@ function App() {
     const timeSinceLastBackup = Date.now() - lastBackup;
 
     if (timeSinceLastBackup >= AUTO_BACKUP_INTERVAL_MS) {
-      window.electronBackup.create(JSON.stringify(database)).then(() => {
+      buildBackupPayload(database).then((payload) =>
+        window.electronBackup!.create(payload)
+      ).then(() => {
         localStorage.setItem("typehere-last-auto-backup", Date.now().toString());
       }).catch(() => {});
     }
   }, [database]);
+
+  useEffect(() => {
+    if (!window.electronBackup) return;
+
+    const handler = async () => {
+      const db = databaseRef.current;
+      const hasContent = db && db.some((n) => n.content.trim().length > 0);
+      if (hasContent) {
+        try {
+          const payload = await buildBackupPayload(db);
+          await window.electronBackup!.create(payload);
+          localStorage.setItem("typehere-last-auto-backup", Date.now().toString());
+        } catch { /* quit proceeds regardless */ }
+      }
+      window.electronBackup!.sendQuitReady();
+    };
+
+    window.electronBackup.onBeforeQuit(handler);
+    return () => { window.electronBackup!.offBeforeQuit(handler); };
+  }, []);
 
   const openBackupList = async () => {
     if (!window.electronBackup) return;
@@ -1748,9 +1798,25 @@ function App() {
 
   const restoreBackup = async (key: string) => {
     if (!window.electronBackup) return;
-    const notesJson = await window.electronBackup.restore(key);
-    const notes = JSON.parse(notesJson);
-    setDatabase(notes);
+    const raw = await window.electronBackup.restore(key);
+    const parsed = JSON.parse(raw);
+
+    if (Array.isArray(parsed)) {
+      setDatabase(parsed);
+    } else if (parsed.version === 2) {
+      setDatabase(parsed.notes);
+      if (parsed.assets?.length > 0) {
+        await restoreSerializedAssets(parsed.assets as SerializedAsset[]);
+      }
+    } else if (parsed.version === 3) {
+      setDatabase(parsed.notes);
+      if (parsed.assetManifest?.length > 0) {
+        for (const entry of parsed.assetManifest as AssetManifestEntry[]) {
+          try { await downloadAssetFromCloud(entry); } catch { /* best effort */ }
+        }
+      }
+    }
+
     setCurrentWorkspace(null);
     setIsBackupListOpen(false);
   };

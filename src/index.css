@@ -10123,8 +10123,39 @@ body.electron .ace_placeholder {
   flex-wrap: wrap;
 }
 
+.electron .image-widget {
+  padding-left: 70px;
+}
+
 .image-widget-thumb {
   position: relative;
+  display: inline-block;
+}
+
+.image-widget-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  background: linear-gradient(
+    135deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.45) 40%,
+    rgba(255, 255, 255, 0.45) 55%,
+    transparent 55%,
+    transparent 65%,
+    rgba(255, 255, 255, 0.45) 65%,
+    rgba(255, 255, 255, 0.45) 80%,
+    transparent 80%
+  );
+}
+
+.image-widget-thumb:hover .image-widget-resize-handle {
+  opacity: 1;
 }
 
 .image-widget-img {
