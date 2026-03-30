@@ -687,6 +687,7 @@ function App() {
   const [selectedCmdKSuggestionIndex, setSelectedCmdKSuggestionIndex] = useState<number>(0);
   const [cmdKSearchQuery, setCmdKSearchQuery] = useState("");
   const [isCmdKMenuOpen, setIsCmdKMenuOpen] = useState(false);
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [hasVimNavigated, setHasVimNavigated] = useState(false);
   const [isUsingVim, setIsUsingVim] = usePersistentState<boolean>("typehere-vim", false);
   const [isNarrowScreen, setIsNarrowScreen] = usePersistentState<boolean>("typehere-narrow", false);
@@ -720,9 +721,12 @@ function App() {
   }, [currentThemeId]);
 
   useEffect(() => {
-    if (!isCmdKMenuOpen && themeBeforePreviewRef.current !== null) {
-      applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
-      themeBeforePreviewRef.current = null;
+    if (!isCmdKMenuOpen) {
+      if (themeBeforePreviewRef.current !== null) {
+        applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
+        themeBeforePreviewRef.current = null;
+      }
+      setIsThemePickerOpen(false);
     }
   }, [isCmdKMenuOpen]);
 
@@ -913,18 +917,18 @@ function App() {
       const trimmedContent = shouldTrimQuery ? trimmedQuery + "..." : processedCmdKSearchQuery;
 
       const regularCommands: CmdKSuggestion[] = [
-        ...THEMES.map((t) => ({
+        {
           type: cmdKSuggestionActionType,
-          title: `theme: ${t.name.toLowerCase()}${currentThemeId === t.id ? " (current)" : ""}`,
-          content: `${t.name} ${t.isDark ? "dark" : "light"} theme color scheme`,
-          color: t.accentColor,
-          themeId: t.id,
+          title: "choose theme",
+          content: `current: ${currentTheme.name.toLowerCase()}`,
+          color: currentTheme.accentColor,
           onAction: () => {
-            themeBeforePreviewRef.current = null;
-            saveTheme(t.id);
-            return true;
+            setIsThemePickerOpen(true);
+            setCmdKSearchQuery("");
+            setSelectedCmdKSuggestionIndex(0);
+            return false;
           },
-        })),
+        },
         {
           type: "action",
           title: "pin/unpin current note",
@@ -1175,10 +1179,32 @@ function App() {
     [database, cmdKSearchQuery, workspaceNotes, currentNoteId]
   );
 
+  const themeSuggestions = useMemo<CmdKSuggestion[]>(() => {
+    const all: CmdKSuggestion[] = THEMES.map((t) => ({
+      type: cmdKSuggestionActionType,
+      title: `${t.name}${currentThemeId === t.id ? " (current)" : ""}`,
+      content: `${t.name} ${t.isDark ? "dark" : "light"} theme`,
+      color: t.accentColor,
+      themeId: t.id,
+      onAction: () => {
+        themeBeforePreviewRef.current = null;
+        saveTheme(t.id);
+        return true;
+      },
+    }));
+    if (!cmdKSearchQuery) return all;
+    const fuse = new Fuse(all, {
+      keys: ["title", "content"],
+      threshold: 0.4,
+    });
+    return fuse.search(cmdKSearchQuery).map((r) => r.item);
+  }, [cmdKSearchQuery, currentThemeId]);
+
   const cmdKSuggestions = useMemo<CmdKSuggestion[]>(() => {
+    if (isThemePickerOpen) return themeSuggestions;
     const shouldSearchAllNotes = searchAllNotesKeys.some((key) => cmdKSearchQuery.startsWith(key));
     return getAllSuggestions(shouldSearchAllNotes);
-  }, [cmdKSearchQuery, getAllSuggestions]);
+  }, [cmdKSearchQuery, getAllSuggestions, isThemePickerOpen, themeSuggestions]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1196,6 +1222,12 @@ function App() {
         if (themeBeforePreviewRef.current !== null) {
           applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
           themeBeforePreviewRef.current = null;
+        }
+        if (isThemePickerOpen) {
+          setIsThemePickerOpen(false);
+          setCmdKSearchQuery("");
+          setSelectedCmdKSuggestionIndex(0);
+          return;
         }
         setIsCmdKMenuOpen(false);
         focus();
@@ -1599,16 +1631,37 @@ function App() {
         }
       };
 
+      const handlePaste = async (e: ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+          if (!items[i].type.startsWith("image/")) continue;
+          const file = items[i].getAsFile();
+          if (!file) continue;
+
+          e.preventDefault();
+          const assetId = generateAssetId();
+          await saveAsset(assetId, currentNoteIdRef.current ?? "", file, file.type, file.name || "pasted-image");
+
+          const cursor = editor.getCursorPosition();
+          editor.session.insert(cursor, formatImageRef(assetId));
+          return;
+        }
+      };
+
       container.addEventListener("dragenter", handleDragEnter);
       container.addEventListener("dragover", handleDragOver);
       container.addEventListener("dragleave", handleDragLeave);
       container.addEventListener("drop", handleDrop);
+      container.addEventListener("paste", handlePaste);
 
       return () => {
         container.removeEventListener("dragenter", handleDragEnter);
         container.removeEventListener("dragover", handleDragOver);
         container.removeEventListener("dragleave", handleDragLeave);
         container.removeEventListener("drop", handleDrop);
+        container.removeEventListener("paste", handlePaste);
         widgetManager.destroy();
         imageWidgetManagerRef.current = null;
       };
@@ -1969,7 +2022,9 @@ function App() {
                 <button onClick={() => {
                   setMoreMenuPosition(null);
                   setIsCmdKMenuOpen(true);
-                  setCmdKSearchQuery("theme:");
+                  setIsThemePickerOpen(true);
+                  setCmdKSearchQuery("");
+                  setSelectedCmdKSuggestionIndex(0);
                 }}>
                   <span className="more-menu-check" />
                   <span className="more-menu-label">theme: {currentTheme.name.toLowerCase()}</span>
@@ -2065,7 +2120,7 @@ function App() {
                 <input
                   autoFocus
                   ref={cmdKInputDomRef}
-                  placeholder="Search notes..."
+                  placeholder={isThemePickerOpen ? "Search themes..." : "Search notes..."}
                   value={cmdKSearchQuery}
                   onChange={(e) => {
                     setCmdKSearchQuery(e.target.value);
