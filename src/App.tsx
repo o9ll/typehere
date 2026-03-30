@@ -9,6 +9,7 @@ import { MdVisibilityOff } from "react-icons/md";
 import { FiMoreHorizontal } from "react-icons/fi";
 import isElectron from "is-electron";
 import type { BackupEntry } from "./electron.d";
+import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById } from "./themes";
 import "./App.css";
 
 const textsToReplace: [string | RegExp, string][] = [
@@ -436,7 +437,7 @@ type CmdKSuggestion =
       title: string;
       content: string;
       color?: string;
-      // return true to close the cmd-k menu
+      themeId?: string;
       onAction: () => boolean;
     };
 
@@ -455,8 +456,10 @@ const freshDatabase = [
 
 
 const themeId = "typehere-theme";
-if (localStorage.getItem(themeId) === '"dark"') {
-  document.documentElement.setAttribute("data-theme", "dark");
+if (!restoreThemeFromCache()) {
+  if (localStorage.getItem(themeId) === '"dark"') {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
 }
 
 const sortNotes = (notes: Note[]) => {
@@ -801,7 +804,8 @@ function App() {
 
   const fileInputDomRef = useRef<HTMLInputElement>(null);
 
-  const [currentTheme, setCurrentTheme] = usePersistentState<"light" | "dark">(themeId, "light");
+  const [currentThemeId, setCurrentThemeId] = usePersistentState<string>(themeId, "light");
+  const currentTheme = getThemeById(currentThemeId);
   const [selectedCmdKSuggestionIndex, setSelectedCmdKSuggestionIndex] = useState<number>(0);
   const [cmdKSearchQuery, setCmdKSearchQuery] = useState("");
   const [isCmdKMenuOpen, setIsCmdKMenuOpen] = useState(false);
@@ -815,23 +819,23 @@ function App() {
   );
   const [shouldShowHiddenNotes, setShouldShowHiddenNotes] = useState(false);
 
-  const toggleTheme = () => {
-    const newTheme = currentTheme === "light" ? "dark" : "light";
-    saveTheme(newTheme);
-  };
+  const themeBeforePreviewRef = useRef<string | null>(null);
 
-  const saveTheme = (theme: "light" | "dark") => {
-    setCurrentTheme(theme);
-    document.documentElement.setAttribute("data-theme", theme);
+  const saveTheme = (id: string) => {
+    setCurrentThemeId(id);
+    applyThemeToDocument(getThemeById(id));
   };
 
   useEffect(() => {
-    if (currentTheme === "dark") {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.setAttribute("data-theme", "light");
+    applyThemeToDocument(currentTheme);
+  }, [currentThemeId]);
+
+  useEffect(() => {
+    if (!isCmdKMenuOpen && themeBeforePreviewRef.current !== null) {
+      applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
+      themeBeforePreviewRef.current = null;
     }
-  }, [currentTheme]);
+  }, [isCmdKMenuOpen]);
 
   const moveNoteToWorkspace = (note: Note, workspace?: string) => {
     note.workspace = workspace;
@@ -1020,17 +1024,18 @@ function App() {
       const trimmedContent = shouldTrimQuery ? trimmedQuery + "..." : processedCmdKSearchQuery;
 
       const regularCommands: CmdKSuggestion[] = [
-        {
-          type: "action",
-          title: "toggle light dark theme mode",
-          content: "enter " + (currentTheme === "light" ? "dark" : "light") + " mode",
-          color: "#B39DDB", // A soothing lavender
+        ...THEMES.map((t) => ({
+          type: cmdKSuggestionActionType,
+          title: `theme: ${t.name.toLowerCase()}${currentThemeId === t.id ? " (current)" : ""}`,
+          content: `${t.name} ${t.isDark ? "dark" : "light"} theme color scheme`,
+          color: t.accentColor,
+          themeId: t.id,
           onAction: () => {
-            toggleTheme();
-            setCmdKSearchQuery("");
-            return false;
+            themeBeforePreviewRef.current = null;
+            saveTheme(t.id);
+            return true;
           },
-        },
+        })),
         {
           type: "action",
           title: "pin/unpin current note",
@@ -1299,6 +1304,10 @@ function App() {
 
       if (isCmdKMenuOpen && e.code === "Escape") {
         e.preventDefault();
+        if (themeBeforePreviewRef.current !== null) {
+          applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
+          themeBeforePreviewRef.current = null;
+        }
         setIsCmdKMenuOpen(false);
         focus();
         return;
@@ -1378,6 +1387,15 @@ function App() {
           const element = document.getElementById(elementId);
           if (element) {
             element.scrollIntoView({ block: "center" });
+          }
+          const nextSuggestion = cmdKSuggestions[nextIndex];
+          if (nextSuggestion?.type === "action" && nextSuggestion.themeId) {
+            if (themeBeforePreviewRef.current === null) {
+              themeBeforePreviewRef.current = currentThemeId;
+            }
+            applyThemeToDocument(getThemeById(nextSuggestion.themeId), true);
+          } else if (themeBeforePreviewRef.current !== null) {
+            applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
           }
           return;
         }
@@ -1786,7 +1804,7 @@ function App() {
           }}
         >
           <AceEditor
-            theme={currentTheme === "dark" ? "clouds_midnight" : "clouds"}
+            theme={currentTheme.isDark ? "clouds_midnight" : "clouds"}
             ref={aceEditorRef}
             value={textValue}
             onChange={(newText: string) => {
@@ -1965,9 +1983,13 @@ function App() {
                   <span className="more-menu-check">{isUsingVim ? "✓" : ""}</span>
                   <span className="more-menu-label">vim mode</span>
                 </button>
-                <button onClick={() => toggleTheme()}>
-                  <span className="more-menu-check">{currentTheme === "dark" ? "✓" : ""}</span>
-                  <span className="more-menu-label">dark mode</span>
+                <button onClick={() => {
+                  setMoreMenuPosition(null);
+                  setIsCmdKMenuOpen(true);
+                  setCmdKSearchQuery("theme:");
+                }}>
+                  <span className="more-menu-check" />
+                  <span className="more-menu-label">theme: {currentTheme.name.toLowerCase()}</span>
                 </button>
                 <div className="more-menu-divider" />
                 <button

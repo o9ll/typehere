@@ -41,6 +41,8 @@
   --on-fill-color: #ffffff;
   --pin-color: #f57d1f;
   --hidden-color: #005490d0;
+  --cursor-color: black;
+  --cursor-block-color: rgba(0, 0, 0, 0.2);
 }
 
 :root[data-theme='dark'] {
@@ -48,29 +50,405 @@
   --hover-background-color: #333333;
   --note-background-color: #222222;
   --note-selected-background-color: #555555;
-  --delete-btn-background-color: #fe3f3f; /* Weaker red for dark mode */
-  --delete-btn-hover-background-color: #ff2020; /* Slightly stronger red for hover in dark mode */
+  --delete-btn-background-color: #fe3f3f;
+  --delete-btn-hover-background-color: #ff2020;
   --timestamp-color: #cccccc;
-  --overlay-background-color: rgba(
-    0,
-    0,
-    0,
-    0.7
-  ); /* Increased opacity for better visibility */
-  --box-shadow-color: rgba(
-    0,
-    0,
-    0,
-    0.2
-  ); /* Increased shadow for better visibility */
-  --untitled-note-title-color: #99999966; /* Removed quotes for consistency */
+  --overlay-background-color: rgba(0, 0, 0, 0.7);
+  --box-shadow-color: rgba(0, 0, 0, 0.2);
+  --untitled-note-title-color: #99999966;
   --keyboard-key-color: rgba(40, 40, 33, 0.836);
   --dark-color: #ffffff;
-  --secondary-dark-color: #555;
+  --secondary-dark-color: #555555;
   --light-color: #121212;
   --on-fill-color: #ffffff;
   --pin-color: #fda403;
   --hidden-color: #5fb2ee78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='paper'] {
+  --border-color: #d4c9b5;
+  --hover-background-color: #ebe5d9;
+  --note-background-color: #f5f0e8;
+  --note-selected-background-color: #e0d9cb;
+  --delete-btn-background-color: #e05252;
+  --delete-btn-hover-background-color: #d43d3d;
+  --timestamp-color: #7a6e61;
+  --overlay-background-color: rgba(0, 0, 0, 0.4);
+  --box-shadow-color: rgba(0, 0, 0, 0.08);
+  --untitled-note-title-color: #7a6e6166;
+  --keyboard-key-color: rgba(60, 53, 48, 0.8);
+  --dark-color: #3c3530;
+  --secondary-dark-color: #9b8f82;
+  --light-color: #faf5ed;
+  --on-fill-color: #ffffff;
+  --pin-color: #d4820a;
+  --hidden-color: #5a7fa0d0;
+}
+
+:root[data-theme='sepia'] {
+  --border-color: #c9b99a;
+  --hover-background-color: #e8dfc8;
+  --note-background-color: #f4ecd8;
+  --note-selected-background-color: #ddd4bf;
+  --delete-btn-background-color: #c0392b;
+  --delete-btn-hover-background-color: #a93226;
+  --timestamp-color: #7a6b57;
+  --overlay-background-color: rgba(0, 0, 0, 0.4);
+  --box-shadow-color: rgba(0, 0, 0, 0.08);
+  --untitled-note-title-color: #7a6b5766;
+  --keyboard-key-color: rgba(91, 70, 54, 0.8);
+  --dark-color: #5b4636;
+  --secondary-dark-color: #8c7a66;
+  --light-color: #f9f3e3;
+  --on-fill-color: #ffffff;
+  --pin-color: #cc6a00;
+  --hidden-color: #5a7d9cd0;
+}
+
+:root[data-theme='nord-light'] {
+  --border-color: #d8dee9;
+  --hover-background-color: #e5e9f0;
+  --note-background-color: #eceff4;
+  --note-selected-background-color: #d8dee9;
+  --delete-btn-background-color: #bf616a;
+  --delete-btn-hover-background-color: #a5525b;
+  --timestamp-color: #616e88;
+  --overlay-background-color: rgba(0, 0, 0, 0.4);
+  --box-shadow-color: rgba(0, 0, 0, 0.08);
+  --untitled-note-title-color: #616e8866;
+  --keyboard-key-color: rgba(46, 52, 64, 0.8);
+  --dark-color: #2e3440;
+  --secondary-dark-color: #7b88a1;
+  --light-color: #f0f4f8;
+  --on-fill-color: #ffffff;
+  --pin-color: #d08770;
+  --hidden-color: #5e81acd0;
+}
+
+:root[data-theme='solarized-light'] {
+  --border-color: #d3c6a6;
+  --hover-background-color: #eee8d5;
+  --note-background-color: #fdf6e3;
+  --note-selected-background-color: #eee8d5;
+  --delete-btn-background-color: #dc322f;
+  --delete-btn-hover-background-color: #cb2b29;
+  --timestamp-color: #839496;
+  --overlay-background-color: rgba(0, 0, 0, 0.4);
+  --box-shadow-color: rgba(0, 0, 0, 0.08);
+  --untitled-note-title-color: #83949666;
+  --keyboard-key-color: rgba(101, 123, 131, 0.8);
+  --dark-color: #657b83;
+  --secondary-dark-color: #93a1a1;
+  --light-color: #fdf6e3;
+  --on-fill-color: #ffffff;
+  --pin-color: #cb4b16;
+  --hidden-color: #268bd2d0;
+}
+
+:root[data-theme='rose-pine-dawn'] {
+  --border-color: #dfdad0;
+  --hover-background-color: #f2e9de;
+  --note-background-color: #faf4ed;
+  --note-selected-background-color: #f2e9de;
+  --delete-btn-background-color: #b4637a;
+  --delete-btn-hover-background-color: #9e5469;
+  --timestamp-color: #797593;
+  --overlay-background-color: rgba(0, 0, 0, 0.4);
+  --box-shadow-color: rgba(0, 0, 0, 0.08);
+  --untitled-note-title-color: #79759366;
+  --keyboard-key-color: rgba(87, 82, 121, 0.8);
+  --dark-color: #575279;
+  --secondary-dark-color: #9893a5;
+  --light-color: #fffaf3;
+  --on-fill-color: #ffffff;
+  --pin-color: #ea9d34;
+  --hidden-color: #907aa9d0;
+}
+
+:root[data-theme='catppuccin-latte'] {
+  --border-color: #ccd0da;
+  --hover-background-color: #e6e9ef;
+  --note-background-color: #eff1f5;
+  --note-selected-background-color: #dce0e8;
+  --delete-btn-background-color: #d20f39;
+  --delete-btn-hover-background-color: #b80d33;
+  --timestamp-color: #7287fd;
+  --overlay-background-color: rgba(0, 0, 0, 0.4);
+  --box-shadow-color: rgba(0, 0, 0, 0.08);
+  --untitled-note-title-color: #4c4f6966;
+  --keyboard-key-color: rgba(76, 79, 105, 0.8);
+  --dark-color: #4c4f69;
+  --secondary-dark-color: #7c7f93;
+  --light-color: #e6e9ef;
+  --on-fill-color: #ffffff;
+  --pin-color: #fe640b;
+  --hidden-color: #1e66f5d0;
+}
+
+:root[data-theme='nord'] {
+  --border-color: #4c566a;
+  --hover-background-color: #3b4252;
+  --note-background-color: #2e3440;
+  --note-selected-background-color: #434c5e;
+  --delete-btn-background-color: #bf616a;
+  --delete-btn-hover-background-color: #d06c75;
+  --timestamp-color: #81a1c1;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #d8dee966;
+  --keyboard-key-color: rgba(216, 222, 233, 0.8);
+  --dark-color: #d8dee9;
+  --secondary-dark-color: #616e88;
+  --light-color: #242933;
+  --on-fill-color: #ffffff;
+  --pin-color: #d08770;
+  --hidden-color: #5e81ac78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='dracula'] {
+  --border-color: #44475a;
+  --hover-background-color: #343746;
+  --note-background-color: #282a36;
+  --note-selected-background-color: #44475a;
+  --delete-btn-background-color: #ff5555;
+  --delete-btn-hover-background-color: #ff6e6e;
+  --timestamp-color: #bd93f9;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #f8f8f266;
+  --keyboard-key-color: rgba(248, 248, 242, 0.8);
+  --dark-color: #f8f8f2;
+  --secondary-dark-color: #6272a4;
+  --light-color: #1e1f29;
+  --on-fill-color: #ffffff;
+  --pin-color: #ffb86c;
+  --hidden-color: #8be9fd78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='gruvbox'] {
+  --border-color: #504945;
+  --hover-background-color: #3c3836;
+  --note-background-color: #282828;
+  --note-selected-background-color: #504945;
+  --delete-btn-background-color: #cc241d;
+  --delete-btn-hover-background-color: #fb4934;
+  --timestamp-color: #a89984;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #ebdbb266;
+  --keyboard-key-color: rgba(235, 219, 178, 0.8);
+  --dark-color: #ebdbb2;
+  --secondary-dark-color: #665c54;
+  --light-color: #1d2021;
+  --on-fill-color: #ffffff;
+  --pin-color: #fe8019;
+  --hidden-color: #83a59878;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='tokyo-night'] {
+  --border-color: #3b4261;
+  --hover-background-color: #24283b;
+  --note-background-color: #1a1b26;
+  --note-selected-background-color: #33384e;
+  --delete-btn-background-color: #f7768e;
+  --delete-btn-hover-background-color: #ff8fa3;
+  --timestamp-color: #7aa2f7;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #a9b1d666;
+  --keyboard-key-color: rgba(169, 177, 214, 0.8);
+  --dark-color: #a9b1d6;
+  --secondary-dark-color: #565f89;
+  --light-color: #16161e;
+  --on-fill-color: #ffffff;
+  --pin-color: #ff9e64;
+  --hidden-color: #7dcfff78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='rose-pine'] {
+  --border-color: #403d52;
+  --hover-background-color: #26233a;
+  --note-background-color: #191724;
+  --note-selected-background-color: #312e45;
+  --delete-btn-background-color: #eb6f92;
+  --delete-btn-hover-background-color: #f08da6;
+  --timestamp-color: #c4a7e7;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #e0def466;
+  --keyboard-key-color: rgba(224, 222, 244, 0.8);
+  --dark-color: #e0def4;
+  --secondary-dark-color: #524f67;
+  --light-color: #13111e;
+  --on-fill-color: #ffffff;
+  --pin-color: #f6c177;
+  --hidden-color: #9ccfd878;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='catppuccin-mocha'] {
+  --border-color: #45475a;
+  --hover-background-color: #313244;
+  --note-background-color: #1e1e2e;
+  --note-selected-background-color: #45475a;
+  --delete-btn-background-color: #f38ba8;
+  --delete-btn-hover-background-color: #f5a0b8;
+  --timestamp-color: #89b4fa;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #cdd6f466;
+  --keyboard-key-color: rgba(205, 214, 244, 0.8);
+  --dark-color: #cdd6f4;
+  --secondary-dark-color: #585b70;
+  --light-color: #181825;
+  --on-fill-color: #ffffff;
+  --pin-color: #fab387;
+  --hidden-color: #89dceb78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='solarized-dark'] {
+  --border-color: #2a4e57;
+  --hover-background-color: #073642;
+  --note-background-color: #002b36;
+  --note-selected-background-color: #0a4050;
+  --delete-btn-background-color: #dc322f;
+  --delete-btn-hover-background-color: #ef4340;
+  --timestamp-color: #2aa198;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #83949666;
+  --keyboard-key-color: rgba(131, 148, 150, 0.8);
+  --dark-color: #839496;
+  --secondary-dark-color: #586e75;
+  --light-color: #001e26;
+  --on-fill-color: #ffffff;
+  --pin-color: #cb4b16;
+  --hidden-color: #268bd278;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='one-dark'] {
+  --border-color: #3e4452;
+  --hover-background-color: #2c313c;
+  --note-background-color: #282c34;
+  --note-selected-background-color: #3e4452;
+  --delete-btn-background-color: #e06c75;
+  --delete-btn-hover-background-color: #ef7a83;
+  --timestamp-color: #61afef;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #abb2bf66;
+  --keyboard-key-color: rgba(171, 178, 191, 0.8);
+  --dark-color: #abb2bf;
+  --secondary-dark-color: #5c6370;
+  --light-color: #21252b;
+  --on-fill-color: #ffffff;
+  --pin-color: #d19a66;
+  --hidden-color: #56b6c278;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='everforest'] {
+  --border-color: #475258;
+  --hover-background-color: #343f44;
+  --note-background-color: #2d353b;
+  --note-selected-background-color: #475258;
+  --delete-btn-background-color: #e67e80;
+  --delete-btn-hover-background-color: #f09293;
+  --timestamp-color: #a7c080;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #d3c6aa66;
+  --keyboard-key-color: rgba(211, 198, 170, 0.8);
+  --dark-color: #d3c6aa;
+  --secondary-dark-color: #5c6a72;
+  --light-color: #272e33;
+  --on-fill-color: #ffffff;
+  --pin-color: #dbbc7f;
+  --hidden-color: #83c09278;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='monokai'] {
+  --border-color: #49483e;
+  --hover-background-color: #3e3d32;
+  --note-background-color: #272822;
+  --note-selected-background-color: #49483e;
+  --delete-btn-background-color: #f92672;
+  --delete-btn-hover-background-color: #ff4088;
+  --timestamp-color: #a6e22e;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #f8f8f266;
+  --keyboard-key-color: rgba(248, 248, 242, 0.8);
+  --dark-color: #f8f8f2;
+  --secondary-dark-color: #75715e;
+  --light-color: #1e1f1c;
+  --on-fill-color: #ffffff;
+  --pin-color: #fd971f;
+  --hidden-color: #66d9ef78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='kanagawa'] {
+  --border-color: #363646;
+  --hover-background-color: #2a2a37;
+  --note-background-color: #1f1f28;
+  --note-selected-background-color: #363646;
+  --delete-btn-background-color: #c34043;
+  --delete-btn-hover-background-color: #e46876;
+  --timestamp-color: #7e9cd8;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #dcd7ba66;
+  --keyboard-key-color: rgba(220, 215, 186, 0.8);
+  --dark-color: #dcd7ba;
+  --secondary-dark-color: #54546d;
+  --light-color: #16161d;
+  --on-fill-color: #ffffff;
+  --pin-color: #e6c384;
+  --hidden-color: #7fb4ca78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
+}
+
+:root[data-theme='github-dark'] {
+  --border-color: #30363d;
+  --hover-background-color: #161b22;
+  --note-background-color: #0d1117;
+  --note-selected-background-color: #30363d;
+  --delete-btn-background-color: #f85149;
+  --delete-btn-hover-background-color: #ff6b61;
+  --timestamp-color: #58a6ff;
+  --overlay-background-color: rgba(0, 0, 0, 0.6);
+  --box-shadow-color: rgba(0, 0, 0, 0.3);
+  --untitled-note-title-color: #e6edf366;
+  --keyboard-key-color: rgba(230, 237, 243, 0.8);
+  --dark-color: #e6edf3;
+  --secondary-dark-color: #484f58;
+  --light-color: #010409;
+  --on-fill-color: #ffffff;
+  --pin-color: #d29922;
+  --hidden-color: #58a6ff78;
+  --cursor-color: white;
+  --cursor-block-color: rgba(255, 255, 255, 0.3);
 }
 
 html,
@@ -88,29 +466,15 @@ input {
 }
 
 .ace_cursor {
-  /* background-color: white;
-  border: 1px solid white !important; */
-  color: black !important;
+  color: var(--cursor-color) !important;
 }
 
 .normal-mode .ace_cursor {
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--cursor-block-color);
 }
 
 .normal-mode .ace_hidden-cursors .ace_cursor {
-  border-color: rgba(0, 0, 0, 0.2);
-}
-
-[data-theme='dark'] .ace_cursor {
-  color: white !important;
-}
-
-[data-theme='dark'] .normal-mode .ace_cursor {
-  background-color: rgba(255, 255, 255, 0.3);
-}
-
-[data-theme='dark'] .normal-mode .ace_hidden-cursors .ace_cursor {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--cursor-block-color);
 }
 
 #editor {
@@ -219,10 +583,6 @@ body.show-scrollbar #controls {
   font-size: 0.8rem;
   margin-left: 6px;
   transition: background-color 0.12s ease;
-}
-
-[data-theme='dark'] .note-list-item-delete-btn {
-  opacity: 0.8;
 }
 
 .note-list-item-delete-btn:hover {
