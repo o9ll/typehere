@@ -925,7 +925,11 @@ function App() {
           onAction: () => {
             setIsThemePickerOpen(true);
             setCmdKSearchQuery("");
-            setSelectedCmdKSuggestionIndex(0);
+            const idx = THEMES.findIndex((t) => t.id === currentThemeId);
+            setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
+            setTimeout(() => {
+              document.getElementById(`note-list-cmdk-item-${idx}`)?.scrollIntoView({ block: "center" });
+            });
             return false;
           },
         },
@@ -2024,7 +2028,11 @@ function App() {
                   setIsCmdKMenuOpen(true);
                   setIsThemePickerOpen(true);
                   setCmdKSearchQuery("");
-                  setSelectedCmdKSuggestionIndex(0);
+                  const idx = THEMES.findIndex((t) => t.id === currentThemeId);
+                  setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
+                  setTimeout(() => {
+                    document.getElementById(`note-list-cmdk-item-${idx}`)?.scrollIntoView({ block: "center" });
+                  });
                 }}>
                   <span className="more-menu-check" />
                   <span className="more-menu-label">theme: {currentTheme.name.toLowerCase()}</span>
