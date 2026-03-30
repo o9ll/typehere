@@ -10,6 +10,9 @@ import { FiMoreHorizontal } from "react-icons/fi";
 import isElectron from "is-electron";
 import type { BackupEntry } from "./electron.d";
 import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById } from "./themes";
+import { saveAsset, generateAssetId, formatImageRef } from "./assets";
+import { ImageWidgetManager } from "./imageWidgets";
+import ImageSpotlight from "./ImageSpotlight";
 import "./App.css";
 
 const textsToReplace: [string | RegExp, string][] = [
@@ -39,16 +42,25 @@ type Migration = {
   migrate: (db: IDBDatabase, transaction: IDBTransaction) => void;
 };
 
+const ASSETS_STORE_NAME = "assets";
+
 const migrations: Migration[] = [
   {
     version: 1,
     migrate: (db, transaction) => {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        console.log("Creating object store:", STORE_NAME);
         db.createObjectStore(STORE_NAME);
       }
       const store = transaction.objectStore(STORE_NAME);
       store.put({ version: 1, stores: [STORE_NAME] }, "db_schema");
+    },
+  },
+  {
+    version: 2,
+    migrate: (db) => {
+      if (!db.objectStoreNames.contains(ASSETS_STORE_NAME)) {
+        db.createObjectStore(ASSETS_STORE_NAME);
+      }
     },
   },
 ];
@@ -704,6 +716,14 @@ function App() {
       setTextValue(workspaceNotes[0].content);
     }
   }, [workspaceNotes, currentNoteId]);
+
+  useEffect(() => {
+    const manager = imageWidgetManagerRef.current;
+    if (manager) {
+      manager.clear();
+      requestAnimationFrame(() => manager.sync());
+    }
+  }, [currentNoteId]);
 
   const focus = () => {
     if (aceEditorRef.current) {
@@ -1596,6 +1616,12 @@ function App() {
     historyStack,
   ]);
 
+  const [spotlightSrc, setSpotlightSrc] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const imageWidgetManagerRef = useRef<ImageWidgetManager | null>(null);
+  const currentNoteIdRef = useRef(currentNoteId);
+  currentNoteIdRef.current = currentNoteId;
+
   useEffect(() => {
     if (textareaDomRef.current) {
       textareaDomRef.current.focus();
@@ -1612,7 +1638,15 @@ function App() {
       editor.commands.removeCommand("findnext");
       editor.commands.removeCommand("removetolineend");
 
-      // Memory optimizations
+      const mode = editor.session.getMode() as { $highlightRules?: { $rules?: Record<string, Array<{ token: string; regex: string }>> } };
+      if (mode.$highlightRules?.$rules?.["start"]) {
+        mode.$highlightRules.$rules["start"].unshift({
+          token: "image_ref",
+          regex: "\\[img:[a-f0-9]+\\]",
+        });
+        editor.session.bgTokenizer.start(0);
+      }
+
       editor.setOption("enableBasicAutocompletion", false);
       editor.setOption("enableLiveAutocompletion", false);
       editor.setOption("enableSnippets", false);
@@ -1658,6 +1692,68 @@ function App() {
         enableLiveAutocompletion: true,
       });
 
+      const widgetManager = new ImageWidgetManager(editor, (src) => setSpotlightSrc(src));
+      imageWidgetManagerRef.current = widgetManager;
+      widgetManager.sync();
+
+      const container = editor.container;
+      let dragDepth = 0;
+
+      const handleDragEnter = (e: DragEvent) => {
+        if (!e.dataTransfer?.types.includes("Files")) return;
+        e.preventDefault();
+        dragDepth++;
+        if (dragDepth === 1) setIsDragOver(true);
+      };
+      const handleDragOver = (e: DragEvent) => {
+        if (e.dataTransfer?.types.includes("Files")) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        }
+      };
+      const handleDragLeave = (e: DragEvent) => {
+        if (!e.dataTransfer?.types.includes("Files")) return;
+        e.preventDefault();
+        dragDepth--;
+        if (dragDepth <= 0) {
+          dragDepth = 0;
+          setIsDragOver(false);
+        }
+      };
+      const handleDrop = async (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragDepth = 0;
+        setIsDragOver(false);
+        const files = e.dataTransfer?.files;
+        if (!files) return;
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (!file.type.startsWith("image/")) continue;
+
+          const assetId = generateAssetId();
+          await saveAsset(assetId, currentNoteIdRef.current ?? "", file, file.type, file.name);
+
+          const cursor = editor.getCursorPosition();
+          editor.session.insert(cursor, formatImageRef(assetId));
+        }
+      };
+
+      container.addEventListener("dragenter", handleDragEnter);
+      container.addEventListener("dragover", handleDragOver);
+      container.addEventListener("dragleave", handleDragLeave);
+      container.addEventListener("drop", handleDrop);
+
+      return () => {
+        container.removeEventListener("dragenter", handleDragEnter);
+        container.removeEventListener("dragover", handleDragOver);
+        container.removeEventListener("dragleave", handleDragLeave);
+        container.removeEventListener("drop", handleDrop);
+        widgetManager.destroy();
+        imageWidgetManagerRef.current = null;
+      };
     }
   }, []);
 
@@ -1804,8 +1900,14 @@ function App() {
             height: isElectron() ? "calc(100vh - 28px)" : "100vh",
             paddingLeft: isNarrowScreen ? 0 : 36,
             paddingRight: shouldShowScrollbar ? 0 : isNarrowScreen ? 0 : 36,
+            position: "relative",
           }}
         >
+          {isDragOver && (
+            <div className="image-drop-overlay">
+              <span className="image-drop-overlay-text">drop image</span>
+            </div>
+          )}
           <AceEditor
             mode="markdown"
             theme={currentTheme.isDark ? "clouds_midnight" : "clouds"}
@@ -1814,6 +1916,7 @@ function App() {
             onChange={(newText: string) => {
               setTextValue(newText);
               saveNote(currentNoteId, newText);
+              imageWidgetManagerRef.current?.scheduleSync();
             }}
             setOptions={{
               showLineNumbers: false,
@@ -2303,6 +2406,9 @@ function App() {
             document.body
           )}
       </main>
+      {spotlightSrc && (
+        <ImageSpotlight src={spotlightSrc} onClose={() => setSpotlightSrc(null)} />
+      )}
     </>
   );
 }
