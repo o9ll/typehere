@@ -32,11 +32,6 @@ const digitCount = 5;
 const DB_NAME = "typehere-db";
 const STORE_NAME = "app-state";
 
-interface DBSchema {
-  version: number;
-  stores: string[];
-}
-
 type Migration = {
   version: number;
   migrate: (db: IDBDatabase, transaction: IDBTransaction) => void;
@@ -100,27 +95,24 @@ function closeAllConnections() {
 
 async function initDB() {
   if (!window.indexedDB) {
-    console.error("Your browser doesn't support IndexedDB");
     return Promise.reject(new Error("IndexedDB not supported"));
   }
 
-  // Check pool first
   const existingConnection = getConnectionFromPool(DB_NAME);
   if (existingConnection) {
     return existingConnection;
   }
 
+  closeAllConnections();
+
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION_LATEST);
 
     request.onerror = () => {
-      console.error("Database error:", request.error);
       reject(request.error);
     };
 
     request.onblocked = () => {
-      console.warn("Database blocked. Please close other tabs with this app open");
-      reject(new Error("Database blocked"));
     };
 
     request.onsuccess = () => {
@@ -162,120 +154,63 @@ async function getFromDB<T>(key: string): Promise<T | undefined> {
     const db = await initDB();
 
     if (!db.objectStoreNames.contains(STORE_NAME)) {
-      console.warn("Store not found, reinitializing database...");
-      closeAllConnections();
-      await new Promise((resolve, reject) => {
-        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-        deleteRequest.onsuccess = () => resolve(undefined);
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-      });
-      return getFromDB(key);
+      return undefined;
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       let transaction: IDBTransaction;
       try {
         transaction = db.transaction(STORE_NAME, "readonly");
-      } catch (error) {
-        console.error("Failed to create transaction:", error);
+      } catch {
         closeAllConnections();
-        // Try again after clearing the database
-        reject(error);
-        new Promise<void>((resolveDelete) => {
-          const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-          deleteRequest.onsuccess = () => resolveDelete();
-          deleteRequest.onerror = () => resolveDelete();
-        }).then(() => {
-          getFromDB<T>(key).then(resolve).catch(reject);
-        });
+        resolve(undefined);
         return;
       }
 
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get(key);
 
-      transaction.onerror = () => {
-        console.error("Transaction error:", transaction.error);
-        reject(transaction.error);
-      };
-
-      request.onerror = () => {
-        console.error("Read error:", request.error);
-        reject(request.error);
-      };
-
+      transaction.onerror = () => resolve(undefined);
+      request.onerror = () => resolve(undefined);
       request.onsuccess = () => resolve(request.result);
     });
-  } catch (error) {
-    console.error("Failed to read from IndexedDB:", error);
+  } catch {
     return undefined;
   }
 }
 
 async function setInDB<T>(key: string, value: T): Promise<void> {
-  let db: IDBDatabase | null = null;
   try {
-    db = await initDB();
+    const db = await initDB();
 
     if (!db.objectStoreNames.contains(STORE_NAME)) {
-      console.warn("Store not found, reinitializing database...");
-      closeAllConnections();
-      await new Promise((resolve, reject) => {
-        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-        deleteRequest.onsuccess = () => resolve(undefined);
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-      });
-      return setInDB(key, value);
+      localStorage.setItem(key, JSON.stringify(value));
+      return;
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       let transaction: IDBTransaction;
       try {
-        transaction = db!.transaction(STORE_NAME, "readwrite");
-      } catch (error) {
-        console.error("Failed to create transaction:", error);
+        transaction = db.transaction(STORE_NAME, "readwrite");
+      } catch {
         closeAllConnections();
-        // Try again after clearing the database
-        reject(error);
-        new Promise<void>((resolveDelete) => {
-          const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-          deleteRequest.onsuccess = () => resolveDelete();
-          deleteRequest.onerror = () => resolveDelete();
-        }).then(() => {
-          setInDB(key, value).then(resolve).catch(reject);
-        });
+        localStorage.setItem(key, JSON.stringify(value));
+        resolve();
         return;
       }
 
       const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(value, key);
+      store.put(value, key);
 
       transaction.onerror = () => {
-        console.error("Transaction error:", transaction.error);
-        reject(transaction.error);
-      };
-
-      request.onerror = () => {
-        console.error("Write error:", request.error);
-        reject(request.error);
-      };
-
-      transaction.oncomplete = () => {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
         resolve();
       };
 
-      request.onsuccess = () => {
-        // Don't resolve here, wait for transaction complete
-      };
+      transaction.oncomplete = () => resolve();
     });
-  } catch (error) {
-    console.error("Failed to write to IndexedDB:", error);
-    // Fallback to localStorage if IndexedDB fails
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error("Failed to write to localStorage:", e);
-    }
+  } catch {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
   }
 }
 
@@ -479,84 +414,7 @@ const sortNotes = (notes: Note[]) => {
   return notes.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 };
 
-// Helper function to check current schema version - now uses direct IndexedDB access
-async function getCurrentSchema(): Promise<DBSchema | undefined> {
-  return new Promise<DBSchema | undefined>((resolve) => {
-    const request = indexedDB.open(DB_NAME);
-
-    request.onerror = () => {
-      console.error("Failed to open DB for schema check:", request.error);
-      resolve(undefined);
-    };
-
-    request.onsuccess = () => {
-      const db = request.result;
-      try {
-        // Check if the object store exists first
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          console.warn(`Object store ${STORE_NAME} does not exist`);
-          db.close();
-          resolve(undefined);
-          return;
-        }
-
-        const transaction = db.transaction(STORE_NAME, "readonly");
-        const store = transaction.objectStore(STORE_NAME);
-        const schemaRequest = store.get("db_schema");
-
-        schemaRequest.onerror = () => {
-          console.error("Failed to get schema:", schemaRequest.error);
-          db.close();
-          resolve(undefined);
-        };
-
-        schemaRequest.onsuccess = () => {
-          db.close();
-          resolve(schemaRequest.result);
-        };
-      } catch (error) {
-        console.error("Error accessing schema:", error);
-        db.close();
-        resolve(undefined);
-      }
-    };
-  });
-}
-
-// Add a function to check and log schema version - useful for debugging
-async function checkSchemaVersion() {
-  const schema = await getCurrentSchema();
-  console.log("Current schema version:", schema?.version || "not set");
-  return schema;
-}
-
-// Initialize and check database health at startup
-async function initializeDatabase() {
-  try {
-    // First check if we can access the schema
-    const schema = await checkSchemaVersion();
-    if (!schema) {
-      console.warn("No schema found or database corrupted, reinitializing...");
-      closeAllConnections();
-      await new Promise<void>((resolve) => {
-        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-        deleteRequest.onsuccess = () => resolve();
-        deleteRequest.onerror = () => {
-          console.error("Failed to delete database:", deleteRequest.error);
-          resolve(); // Continue anyway
-        };
-      });
-    }
-    // Initialize the database
-    await initDB();
-    console.log("Database initialized successfully");
-  } catch (error) {
-    console.error("Failed to initialize database:", error);
-  }
-}
-
-// Call it when the app starts
-initializeDatabase().catch(console.error);
+initDB().catch(() => {});
 
 const getCurrentTime = () => {
   const now = new Date();
@@ -1791,12 +1649,31 @@ function App() {
     try {
       await window.electronBackup.create(JSON.stringify(database));
       setBackupStatus("done");
+      localStorage.setItem("typehere-last-auto-backup", Date.now().toString());
       setTimeout(() => setBackupStatus("idle"), 3000);
     } catch {
       setBackupStatus("error");
       setTimeout(() => setBackupStatus("idle"), 4000);
     }
   };
+
+  const AUTO_BACKUP_INTERVAL_MS = 2 * 24 * 60 * 60 * 1000;
+
+  useEffect(() => {
+    if (!window.electronBackup || !database || database.length === 0) return;
+
+    const hasContent = database.some((note) => note.content.trim().length > 0);
+    if (!hasContent) return;
+
+    const lastBackup = parseInt(localStorage.getItem("typehere-last-auto-backup") ?? "0", 10);
+    const timeSinceLastBackup = Date.now() - lastBackup;
+
+    if (timeSinceLastBackup >= AUTO_BACKUP_INTERVAL_MS) {
+      window.electronBackup.create(JSON.stringify(database)).then(() => {
+        localStorage.setItem("typehere-last-auto-backup", Date.now().toString());
+      }).catch(() => {});
+    }
+  }, [database]);
 
   const openBackupList = async () => {
     if (!window.electronBackup) return;
@@ -1909,7 +1786,6 @@ function App() {
             </div>
           )}
           <AceEditor
-            mode="markdown"
             theme={currentTheme.isDark ? "clouds_midnight" : "clouds"}
             ref={aceEditorRef}
             value={textValue}
