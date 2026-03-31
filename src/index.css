@@ -9643,38 +9643,58 @@ input {
 
 #controls {
   display: flex;
-  gap: 6px;
   align-items: center;
+  justify-content: space-between;
   position: fixed;
-  top: 10px;
+  bottom: 0;
+  left: 0;
   right: 0;
-  margin: 0px 8px;
-  transition: right .3s ease;
+  height: 24px;
+  padding: 0 4px 0 8px;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--dark-color) 40%, transparent);
+  background: var(--note-background-color);
+  border-top: 1px solid color-mix(in srgb, var(--dark-color) 6%, transparent);
   z-index: 12;
   -webkit-app-region: no-drag;
 }
 
-/* Add this new rule */
-body.show-scrollbar #controls {
-  right: 16px; /* Adjust this value as needed */
+#controls .statusbar-left,
+#controls .statusbar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+#controls .statusbar-item {
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#controls .statusbar-path {
+  color: color-mix(in srgb, var(--dark-color) 50%, transparent);
+  max-width: 260px;
+}
+
+#controls .statusbar-dim {
+  color: color-mix(in srgb, var(--dark-color) 28%, transparent);
 }
 
 #controls button {
   cursor: pointer;
   background: transparent;
   border: none;
-  border-radius: 6px;
-  padding: 2px 6px;
-  color: var(--dark-color);
-  opacity: 0.4;
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: color-mix(in srgb, var(--dark-color) 40%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.1s ease;
-}
-
-#controls button:hover {
-  opacity: 0.8;
+  font-size: 0.7rem;
+  font-family: inherit;
 }
 
 .notes-list {

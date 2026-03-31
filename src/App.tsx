@@ -1532,7 +1532,7 @@ function App() {
   useEffect(() => {
     if (aceEditorRef.current) {
       const editor = aceEditorRef.current.editor;
-      editor.renderer.setScrollMargin(32, 32, 0, 0);
+      editor.renderer.setScrollMargin(32, 48, 0, 0);
       editor.commands.removeCommand("findprevious");
       editor.commands.removeCommand("findnext");
       editor.commands.removeCommand("removetolineend");
@@ -1854,6 +1854,18 @@ function App() {
 
   const [currentTime, setCurrentTime] = useState(getCurrentTime());
 
+  const noteTitle = useMemo(() => {
+    const firstLine = textValue.trim().split("\n")[0]?.trim() ?? "";
+    if (!firstLine) return "untitled";
+    return firstLine.length > 30 ? firstLine.slice(0, 30) + "..." : firstLine;
+  }, [textValue]);
+
+  const wordCount = useMemo(() => {
+    const trimmed = textValue.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+  }, [textValue]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(getCurrentTime());
@@ -1960,27 +1972,22 @@ function App() {
           />
         </div>
         <div id="controls">
-          <div
-            style={{
-              color: "var(--dark-color)",
-              opacity: 0.5,
-              fontSize: "0.8rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            {backupStatus !== "idle" && (
-              <>
-                <span style={backupStatus === "error" ? { color: "var(--red-color, #e05252)" } : undefined}>
-                  {backupStatus === "backing-up" ? "backing up..." : backupStatus === "done" ? "backed up" : "backup failed"}
-                </span>
-                {currentWorkspace && <span>·</span>}
-              </>
-            )}
-            {currentWorkspace && <span>[{currentWorkspace}]</span>}
-            <span>[{currentTime}]</span>
+          <div className="statusbar-left">
+            <span className="statusbar-item statusbar-path">
+              <span>{noteTitle}</span>
+              {currentWorkspace && (
+                <span className="statusbar-dim"> ({currentWorkspace})</span>
+              )}
+            </span>
+            <span className="statusbar-item statusbar-dim">{wordCount}w</span>
           </div>
+          <div className="statusbar-right">
+            {backupStatus !== "idle" && (
+              <span className="statusbar-item" style={backupStatus === "error" ? { color: "var(--red-color, #e05252)" } : undefined}>
+                {backupStatus === "backing-up" ? "backing up..." : backupStatus === "done" ? "backed up" : "backup failed"}
+              </span>
+            )}
+            <span className="statusbar-item">{currentTime}</span>
           {isHelpMenuOpen &&
             createPortal(
               <>
@@ -2059,7 +2066,7 @@ function App() {
               const rect = e.currentTarget.getBoundingClientRect();
               setMoreMenuPosition({
                 x: window.innerWidth - (rect.x + rect.width),
-                y: rect.y + rect.height + 4,
+                y: window.innerHeight - rect.y + 4,
               });
             }}
             aria-label="More"
@@ -2085,7 +2092,7 @@ function App() {
                 style={{
                   position: "fixed",
                   right: moreMenuPosition.x,
-                  top: moreMenuPosition.y,
+                  bottom: moreMenuPosition.y,
                   zIndex: 100,
                 }}
                 className="more-menu"
@@ -2176,6 +2183,7 @@ function App() {
               </div>
             </>
           )}
+          </div>
         </div>
         {isCmdKMenuOpen &&
           createPortal(

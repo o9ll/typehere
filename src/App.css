@@ -1,6 +1,9 @@
 .custom-title-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 38px;
-  width: 100%;
-  background-color: var(--note-background-color);
+  z-index: 10;
   -webkit-app-region: drag;
 }
