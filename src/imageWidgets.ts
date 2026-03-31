@@ -19,7 +19,7 @@ interface LineWidget {
 
 interface RowEntry {
   cacheKey: string;
-  objectUrls: string[];
+  refKey: string;
   widget: LineWidget;
 }
 
@@ -33,6 +33,7 @@ type SpotlightCallback = (objectUrl: string) => void;
 export class ImageWidgetManager {
   private _editor: Ace.Editor;
   private _rows: Map<number, RowEntry> = new Map();
+  private _urlCache: Map<string, string> = new Map();
   private _onSpotlight: SpotlightCallback;
   private _syncPending = false;
   private _skipNextSync = false;
@@ -40,6 +41,16 @@ export class ImageWidgetManager {
   constructor(editor: Ace.Editor, onSpotlight: SpotlightCallback) {
     this._editor = editor;
     this._onSpotlight = onSpotlight;
+  }
+
+  private async _getObjectUrl(assetId: string): Promise<string | null> {
+    const cached = this._urlCache.get(assetId);
+    if (cached) return cached;
+    const asset = await getAsset(assetId);
+    if (!asset) return null;
+    const url = URL.createObjectURL(asset.blob);
+    this._urlCache.set(assetId, url);
+    return url;
   }
 
   scheduleSync() {
@@ -51,14 +62,18 @@ export class ImageWidgetManager {
     });
   }
 
+  private _refKey(refs: ImageRef[]): string {
+    return refs.map((r) => `${r.id}:${r.scale ?? ""}`).join(",");
+  }
+
   private _cacheKey(refs: ImageRef[], indent: number): string {
-    const refPart = refs.map((r) => `${r.id}:${r.scale ?? ""}`).join(",");
-    return `${indent}|${refPart}`;
+    return `${indent}|${this._refKey(refs)}`;
   }
 
   private _lineIndent(line: string): number {
-    const match = line.match(/^(\s*)/);
-    return match ? match[1].length : 0;
+    let i = 0;
+    while (i < line.length && (line[i] === " " || line[i] === "\t")) i++;
+    return i;
   }
 
   async sync() {
@@ -79,15 +94,39 @@ export class ImageWidgetManager {
       }
     }
 
-    const toRemove: number[] = [];
+    const stale: Map<number, RowEntry> = new Map();
     for (const [row, entry] of this._rows) {
       const d = desired.get(row);
-      if (!d || this._cacheKey(d.refs, d.indent) !== entry.cacheKey) {
-        toRemove.push(row);
+      if (!d || this._cacheKey(d.refs, d.indent) !== entry.cacheKey || entry.widget.row !== row) {
+        stale.set(row, entry);
       }
     }
-    for (const row of toRemove) {
-      this._removeRow(row);
+
+    const pending: number[] = [];
+    for (const [row] of desired) {
+      if (!this._rows.has(row) || stale.has(row)) {
+        pending.push(row);
+      }
+    }
+
+    const recyclable = new Map<string, { mapKey: number; entry: RowEntry }>();
+    for (const [mapKey, entry] of stale) {
+      recyclable.set(entry.refKey, { mapKey, entry });
+    }
+
+    for (const row of pending) {
+      const d = desired.get(row)!;
+      const rk = this._refKey(d.refs);
+      const donor = recyclable.get(rk);
+      if (donor) {
+        this._relocateRow(donor.mapKey, row, d.indent);
+        stale.delete(donor.mapKey);
+        recyclable.delete(rk);
+      }
+    }
+
+    for (const mapKey of stale.keys()) {
+      this._removeRow(mapKey);
     }
 
     for (const [row, { refs, indent }] of desired) {
@@ -99,7 +138,7 @@ export class ImageWidgetManager {
 
   private _recalcWidgetHeight(widget: LineWidget, container: HTMLElement) {
     const lineHeight = this._editor.renderer.layerConfig.lineHeight;
-    const rowCount = Math.ceil(container.offsetHeight / lineHeight) + 1;
+    const rowCount = Math.ceil(container.offsetHeight / lineHeight);
     if (widget.rowCount !== rowCount) {
       widget.rowCount = rowCount;
       widget.pixelHeight = container.offsetHeight;
@@ -129,7 +168,9 @@ export class ImageWidgetManager {
     );
     const entry = this._rows.get(widget.row);
     if (entry) {
-      entry.cacheKey = this._cacheKey(parseImageRefs(newLine), this._lineIndent(newLine));
+      const updatedRefs = parseImageRefs(newLine);
+      entry.cacheKey = this._cacheKey(updatedRefs, this._lineIndent(newLine));
+      entry.refKey = this._refKey(updatedRefs);
     }
   }
 
@@ -173,14 +214,32 @@ export class ImageWidgetManager {
     wrapper.appendChild(handle);
   }
 
+  private _relocateRow(oldMapKey: number, newRow: number, indent: number) {
+    const entry = this._rows.get(oldMapKey);
+    if (!entry) return;
+    const wm = this._editor.session.widgetManager as WidgetManagerApi;
+    wm.removeLineWidget(entry.widget);
+    entry.widget.row = newRow;
+    if (indent > 0) {
+      entry.widget.el.style.marginLeft = `${indent * this._editor.renderer.characterWidth}px`;
+    } else {
+      entry.widget.el.style.marginLeft = "";
+    }
+    wm.addLineWidget(entry.widget);
+    this._rows.delete(oldMapKey);
+    const line = this._editor.session.getLine(newRow);
+    const refs = parseImageRefs(line);
+    entry.cacheKey = this._cacheKey(refs, indent);
+    entry.refKey = this._refKey(refs);
+    this._rows.set(newRow, entry);
+  }
+
   private async _addRow(row: number, refs: ImageRef[], indent: number) {
     const container = document.createElement("div");
     container.className = "image-widget";
     if (indent > 0) {
       container.style.marginLeft = `${indent * this._editor.renderer.characterWidth}px`;
     }
-
-    const objectUrls: string[] = [];
 
     const widget: LineWidget = {
       row,
@@ -190,12 +249,12 @@ export class ImageWidgetManager {
       className: "image-widget-container",
     };
 
+    let hasImages = false;
     for (const ref of refs) {
-      const asset = await getAsset(ref.id);
-      if (!asset) continue;
+      const objectUrl = await this._getObjectUrl(ref.id);
+      if (!objectUrl) continue;
 
-      const objectUrl = URL.createObjectURL(asset.blob);
-      objectUrls.push(objectUrl);
+      hasImages = true;
 
       const wrapper = document.createElement("div");
       wrapper.className = "image-widget-thumb";
@@ -219,7 +278,7 @@ export class ImageWidgetManager {
       container.appendChild(wrapper);
     }
 
-    if (objectUrls.length === 0) return;
+    if (!hasImages) return;
 
     const lastImg = container.querySelector("img");
     if (lastImg) {
@@ -231,7 +290,7 @@ export class ImageWidgetManager {
     const wm = this._editor.session.widgetManager as WidgetManagerApi;
     wm.addLineWidget(widget);
 
-    this._rows.set(row, { cacheKey: this._cacheKey(refs, indent), objectUrls, widget });
+    this._rows.set(row, { cacheKey: this._cacheKey(refs, indent), refKey: this._refKey(refs), widget });
   }
 
   private _removeRow(row: number) {
@@ -239,9 +298,6 @@ export class ImageWidgetManager {
     if (!entry) return;
     const wm = this._editor.session.widgetManager as WidgetManagerApi;
     wm.removeLineWidget(entry.widget);
-    for (const url of entry.objectUrls) {
-      URL.revokeObjectURL(url);
-    }
     this._rows.delete(row);
   }
 
@@ -253,5 +309,9 @@ export class ImageWidgetManager {
 
   destroy() {
     this.clear();
+    for (const url of this._urlCache.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this._urlCache.clear();
   }
 }

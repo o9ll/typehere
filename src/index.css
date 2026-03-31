@@ -10111,9 +10111,8 @@ body.electron .ace_placeholder {
 }
 
 .ace_image_ref {
-  opacity: 0.3;
-  font-size: 0.75em;
-  font-family: 'Berkeley Mono', 'JetBrains Mono', monospace;
+  color: #c8a855 !important;
+  opacity: 0.7;
 }
 
 .image-widget {
@@ -10144,18 +10143,18 @@ body.electron .ace_placeholder {
   background: linear-gradient(
     135deg,
     transparent 40%,
-    rgba(255, 255, 255, 0.45) 40%,
-    rgba(255, 255, 255, 0.45) 55%,
+    var(--dark-color) 40%,
+    var(--dark-color) 55%,
     transparent 55%,
     transparent 65%,
-    rgba(255, 255, 255, 0.45) 65%,
-    rgba(255, 255, 255, 0.45) 80%,
+    var(--dark-color) 65%,
+    var(--dark-color) 80%,
     transparent 80%
   );
 }
 
 .image-widget-thumb:hover .image-widget-resize-handle {
-  opacity: 1;
+  opacity: 0.45;
 }
 
 .image-widget-img {

@@ -9,11 +9,18 @@ interface AssetRecord {
   name: string;
 }
 
+let _cachedDb: IDBDatabase | null = null;
+
 async function getAssetsDB(): Promise<IDBDatabase> {
+  if (_cachedDb) return _cachedDb;
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME);
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      _cachedDb = request.result;
+      _cachedDb.onclose = () => { _cachedDb = null; };
+      resolve(_cachedDb);
+    };
   });
 }
 

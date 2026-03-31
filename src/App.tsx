@@ -724,7 +724,9 @@ function App() {
   }, [currentThemeId]);
 
   useEffect(() => {
-    if (!isCmdKMenuOpen) {
+    if (isCmdKMenuOpen) {
+      isSuppressingMousePreviewRef.current = true;
+    } else {
       if (themeBeforePreviewRef.current !== null) {
         applyThemeToDocument(getThemeById(themeBeforePreviewRef.current), true);
         themeBeforePreviewRef.current = null;
@@ -927,7 +929,6 @@ function App() {
           color: currentTheme.accentColor,
           onAction: () => {
             setIsThemePickerOpen(true);
-            isSuppressingMousePreviewRef.current = true;
             setCmdKSearchQuery("");
             const idx = THEMES.findIndex((t) => t.id === currentThemeId);
             setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
@@ -1540,8 +1541,10 @@ function App() {
       if (mode.$highlightRules?.$rules?.["start"]) {
         mode.$highlightRules.$rules["start"].unshift({
           token: "image_ref",
-          regex: "\\[img:[a-f0-9]+\\]",
+          regex: "\\[img:[a-f0-9]+(?::\\d*\\.?\\d+)?\\]",
         });
+        (mode as Record<string, unknown>).$tokenizer = null;
+        editor.session.bgTokenizer.setTokenizer(editor.session.getMode().getTokenizer());
         editor.session.bgTokenizer.start(0);
       }
 
@@ -2095,7 +2098,6 @@ function App() {
                   setMoreMenuPosition(null);
                   setIsCmdKMenuOpen(true);
                   setIsThemePickerOpen(true);
-                  isSuppressingMousePreviewRef.current = true;
                   setCmdKSearchQuery("");
                   const idx = THEMES.findIndex((t) => t.id === currentThemeId);
                   setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
