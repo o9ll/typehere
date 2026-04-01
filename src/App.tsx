@@ -990,6 +990,20 @@ function App() {
             return true;
           },
         },
+        ...(window.electronBackup
+          ? [
+              {
+                type: cmdKSuggestionActionType,
+                title: "open cloud backups",
+                content: "list and restore backups",
+                color: "#FFF59D",
+                onAction: () => {
+                  void openBackupList();
+                  return true;
+                },
+              },
+            ]
+          : []),
         {
           type: "action",
           title: "import notes",
