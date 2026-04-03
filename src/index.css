@@ -10213,20 +10213,90 @@ body.electron .ace_placeholder {
   inset: 0;
   z-index: 99999;
   background: rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  animation: spotlight-fade-in 0.15s ease;
+  overflow: hidden;
+}
+
+.image-spotlight-stage {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  cursor: default;
+}
+
+.image-spotlight-toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 64px;
+  padding: 0 12px 12px;
+  cursor: default;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.image-spotlight-toolbar > * {
+  pointer-events: auto;
+}
+
+.image-spotlight-tool-btn {
+  font-family: 'Berkeley Mono', 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  min-width: 2rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
-  animation: spotlight-fade-in 0.15s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.image-spotlight-tool-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.image-spotlight-tool-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.image-spotlight-tool-btn[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.image-spotlight-zoom-label {
+  font-family: 'Berkeley Mono', 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  min-width: 2.75rem;
+  text-align: center;
+  user-select: none;
 }
 
 .image-spotlight-img {
   max-width: 90vw;
   max-height: 90vh;
+  width: auto;
+  height: auto;
   object-fit: contain;
   border-radius: 8px;
-  cursor: default;
+  cursor: zoom-in;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: block;
+  user-select: none;
 }
 
 @keyframes spotlight-fade-in {

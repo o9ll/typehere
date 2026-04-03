@@ -1644,6 +1644,7 @@ function App() {
         const files = e.dataTransfer?.files;
         if (!files) return;
 
+        let isFirstInsertedImage = true;
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           if (!file.type.startsWith("image/")) continue;
@@ -1653,27 +1654,46 @@ function App() {
           uploadAssetToCloud(assetId).catch(() => {});
 
           const cursor = editor.getCursorPosition();
-          editor.session.insert(cursor, formatImageRef(assetId));
+          const ref = formatImageRef(assetId);
+          editor.session.insert(cursor, isFirstInsertedImage ? ref : ` ${ref}`);
+          isFirstInsertedImage = false;
         }
       };
 
       const handlePaste = async (e: ClipboardEvent) => {
-        const items = e.clipboardData?.items;
-        if (!items) return;
+        const clipboardData = e.clipboardData;
+        if (!clipboardData) return;
 
-        for (let i = 0; i < items.length; i++) {
-          if (!items[i].type.startsWith("image/")) continue;
-          const file = items[i].getAsFile();
-          if (!file) continue;
+        const imageFiles: File[] = [];
+        const fileList = clipboardData.files;
+        if (fileList && fileList.length > 0) {
+          for (let i = 0; i < fileList.length; i++) {
+            const file = fileList[i];
+            if (file.type.startsWith("image/")) imageFiles.push(file);
+          }
+        }
+        if (imageFiles.length === 0) {
+          const items = clipboardData.items;
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (!item.type.startsWith("image/")) continue;
+            const file = item.getAsFile();
+            if (file) imageFiles.push(file);
+          }
+        }
+        if (imageFiles.length === 0) return;
 
-          e.preventDefault();
+        e.preventDefault();
+
+        for (let i = 0; i < imageFiles.length; i++) {
+          const file = imageFiles[i];
           const assetId = generateAssetId();
           await saveAsset(assetId, currentNoteIdRef.current ?? "", file, file.type, file.name || "pasted-image");
           uploadAssetToCloud(assetId).catch(() => {});
 
           const cursor = editor.getCursorPosition();
-          editor.session.insert(cursor, formatImageRef(assetId));
-          return;
+          const ref = formatImageRef(assetId);
+          editor.session.insert(cursor, i === 0 ? ref : ` ${ref}`);
         }
       };
 
