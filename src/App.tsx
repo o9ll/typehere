@@ -1553,10 +1553,13 @@ function App() {
 
       const mode = editor.session.getMode() as { $highlightRules?: { $rules?: Record<string, Array<{ token: string; regex: string }>> } };
       if (mode.$highlightRules?.$rules?.["start"]) {
-        mode.$highlightRules.$rules["start"].unshift({
-          token: "image_ref",
-          regex: "\\[img:[a-f0-9]+(?::\\d*\\.?\\d+)?\\]",
-        });
+        const customRules: Array<{ token: string; regex: string }> = [
+          { token: "image_ref", regex: "\\[img:[a-f0-9]+(?::\\d*\\.?\\d+)?\\]" },
+          { token: "important_marker", regex: "!!!" },
+        ];
+        for (const rule of customRules) {
+          mode.$highlightRules.$rules["start"].unshift(rule);
+        }
         (mode as Record<string, unknown>).$tokenizer = null;
         editor.session.bgTokenizer.setTokenizer(editor.session.getMode().getTokenizer());
         editor.session.bgTokenizer.start(0);

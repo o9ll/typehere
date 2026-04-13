@@ -10135,6 +10135,11 @@ body.electron .ace_placeholder {
   opacity: 0.7;
 }
 
+.ace_important_marker {
+  color: #e05252 !important;
+  opacity: 0.85;
+}
+
 .image-widget {
   padding: 8px 0 8px 6px;
   display: flex;
