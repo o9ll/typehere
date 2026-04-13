@@ -12,6 +12,7 @@ import type { BackupEntry } from "./electron.d";
 import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById } from "./themes";
 import { saveAsset, getAsset, generateAssetId, formatImageRef, restoreSerializedAssets, type SerializedAsset, uploadAssetToCloud, downloadAssetFromCloud, type AssetManifestEntry, IMAGE_REF_REGEX } from "./assets";
 import { ImageWidgetManager } from "./imageWidgets";
+import { SpotifyWidgetManager, SPOTIFY_URL_REGEX } from "./spotifyWidgets";
 import ImageSpotlight from "./ImageSpotlight";
 import "./App.css";
 
@@ -578,10 +579,14 @@ function App() {
   }, [workspaceNotes, currentNoteId]);
 
   useEffect(() => {
-    const manager = imageWidgetManagerRef.current;
-    if (!manager) return;
-    manager.clear();
-    const id = setTimeout(() => manager.sync(), 50);
+    const imgManager = imageWidgetManagerRef.current;
+    const spotifyManager = spotifyWidgetManagerRef.current;
+    if (imgManager) imgManager.clear();
+    if (spotifyManager) spotifyManager.clear();
+    const id = setTimeout(() => {
+      imgManager?.sync();
+      spotifyManager?.sync();
+    }, 50);
     return () => clearTimeout(id);
   }, [currentNoteId]);
 
@@ -1532,6 +1537,7 @@ function App() {
   const [spotlightSrc, setSpotlightSrc] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const imageWidgetManagerRef = useRef<ImageWidgetManager | null>(null);
+  const spotifyWidgetManagerRef = useRef<SpotifyWidgetManager | null>(null);
   const currentNoteIdRef = useRef(currentNoteId);
   currentNoteIdRef.current = currentNoteId;
 
@@ -1556,6 +1562,7 @@ function App() {
         const customRules: Array<{ token: string; regex: string }> = [
           { token: "image_ref", regex: "\\[img:[a-f0-9]+(?::\\d*\\.?\\d+)?\\]" },
           { token: "important_marker", regex: "!!!" },
+          { token: "spotify_url", regex: SPOTIFY_URL_REGEX.source },
         ];
         for (const rule of customRules) {
           mode.$highlightRules.$rules["start"].unshift(rule);
@@ -1613,6 +1620,10 @@ function App() {
       const widgetManager = new ImageWidgetManager(editor, (src) => setSpotlightSrc(src));
       imageWidgetManagerRef.current = widgetManager;
       widgetManager.sync();
+
+      const spotifyManager = new SpotifyWidgetManager(editor);
+      spotifyWidgetManagerRef.current = spotifyManager;
+      spotifyManager.sync();
 
       const container = editor.container;
       let dragDepth = 0;
@@ -1714,6 +1725,8 @@ function App() {
         container.removeEventListener("paste", handlePaste);
         widgetManager.destroy();
         imageWidgetManagerRef.current = null;
+        spotifyManager.destroy();
+        spotifyWidgetManagerRef.current = null;
       };
     }
   }, []);
@@ -1970,6 +1983,7 @@ function App() {
               setTextValue(newText);
               saveNote(currentNoteId, newText);
               imageWidgetManagerRef.current?.scheduleSync();
+              spotifyWidgetManagerRef.current?.scheduleSync();
             }}
             setOptions={{
               showLineNumbers: false,
