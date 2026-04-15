@@ -2241,7 +2241,7 @@ function App() {
             <>
               <div
                 className="ui-overlay"
-                style={{ zIndex: 200 }}
+                style={{ zIndex: 200, ...(isThemePickerOpen && { background: "transparent" }) }}
                 onClick={() => setIsCmdKMenuOpen(false)}
               />
               <div
