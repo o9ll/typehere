@@ -9616,6 +9616,14 @@ input {
   background: var(--note-background-color);
 }
 
+.ace_marker-layer .ace_selection {
+  background: color-mix(in srgb, var(--dark-color) 18%, var(--note-background-color)) !important;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--dark-color) 25%, var(--note-background-color));
+}
+
 .ace_cursor {
   color: var(--cursor-color) !important;
 }
