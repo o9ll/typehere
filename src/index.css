@@ -9986,6 +9986,14 @@ input {
   font-style: italic;
 }
 
+.cmdk-ft-empty {
+  text-align: center;
+  padding: 22px 12px;
+  font-size: 0.75rem;
+  color: var(--secondary-dark-color);
+  user-select: none;
+}
+
 .cmdk-enter-hint {
   font-size: 0.7rem;
   padding: 1px 5px;

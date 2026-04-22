@@ -2515,6 +2515,11 @@ function App() {
                     padding: "4px",
                   }}
                 >
+                  {isFullTextSearchMode && cmdKSuggestions.length === 0 && (
+                    <div className="cmdk-ft-empty">
+                      {cmdKSearchQuery.trim() ? "no matches" : "search all notes"}
+                    </div>
+                  )}
                   {cmdKSuggestions.map((suggestion, index) => {
                     if (suggestion.type === "noteHeader") {
                       const note = suggestion.note;
