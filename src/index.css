@@ -9869,6 +9869,123 @@ input {
   border-radius: 3px;
 }
 
+.cmdk-ft-chip {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--hover-background-color);
+  color: var(--dark-color);
+  opacity: 0.65;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cmdk-ft-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 4px;
+  font-size: 0.72rem;
+  color: var(--dark-color);
+  opacity: 0.75;
+  cursor: default;
+  user-select: none;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
+.cmdk-ft-header:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+
+.cmdk-ft-header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+
+.cmdk-ft-header-workspace {
+  font-size: 0.68rem;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.cmdk-ft-header-count {
+  margin-left: auto;
+  font-size: 0.68rem;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.cmdk-ft-match {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px 4px 20px;
+}
+
+.cmdk-ft-line-number {
+  font-size: 0.68rem;
+  color: var(--secondary-dark-color);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 22px;
+  text-align: right;
+}
+
+.cmdk-ft-snippet {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.75rem;
+  color: var(--dark-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.cmdk-ft-snippet mark {
+  background: rgba(255, 200, 60, 0.4);
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+.cmdk-ft-more {
+  padding: 2px 10px 6px 20px;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.cmdk-ft-more .cmdk-ft-snippet {
+  font-family: inherit;
+  font-style: italic;
+}
+
 .cmdk-enter-hint {
   font-size: 0.7rem;
   padding: 1px 5px;

@@ -383,6 +383,27 @@ type CmdKSuggestion =
       note: Note;
     }
   | {
+      type: "noteHeader";
+      note: Note;
+      matchCount: number;
+    }
+  | {
+      type: "noteMatch";
+      note: Note;
+      row: number;
+      column: number;
+      lineText: string;
+      matchStart: number;
+      matchEnd: number;
+    }
+  | {
+      type: "noteMoreMatches";
+      note: Note;
+      remaining: number;
+      row: number;
+      column: number;
+    }
+  | {
       type: "action";
       title: string;
       content: string;
@@ -392,6 +413,10 @@ type CmdKSuggestion =
     };
 
 const cmdKSuggestionActionType = "action" as const;
+
+const FULL_TEXT_MAX_SNIPPETS_PER_NOTE = 3;
+const FULL_TEXT_SNIPPET_WINDOW = 80;
+const FULL_TEXT_HIDDEN_KEYWORD_PREFIX_LENGTH = 5;
 
 const freshDatabase = [
   {
@@ -622,13 +647,14 @@ function App() {
   const openNote = (
     noteId: string,
     shouldFocus: boolean = true,
-    shouldUpdateHistory: boolean = true
+    shouldUpdateHistory: boolean = true,
+    target?: { row: number; column: number }
   ) => {
     if (!noteId || !database?.find((n) => n.id === noteId)) {
       return;
     }
 
-    setLastAceCursorPosition({ row: 0, column: 0 });
+    setLastAceCursorPosition(target ?? { row: 0, column: 0 });
     setCurrentNoteId(noteId);
 
     const n = database?.find((n) => n.id === noteId);
@@ -650,7 +676,12 @@ function App() {
           const editor = aceEditorRef.current.editor;
           editor.getSession().getUndoManager().reset();
           editor.clearSelection();
-          editor.moveCursorTo(0, 0);
+          if (target) {
+            editor.gotoLine(target.row + 1, target.column, true);
+            editor.scrollToLine(target.row, true, true, () => {});
+          } else {
+            editor.moveCursorTo(0, 0);
+          }
         }
       }, 10);
     }
@@ -696,6 +727,7 @@ function App() {
   const [selectedCmdKSuggestionIndex, setSelectedCmdKSuggestionIndex] = useState<number>(0);
   const [cmdKSearchQuery, setCmdKSearchQuery] = useState("");
   const [isCmdKMenuOpen, setIsCmdKMenuOpen] = useState(false);
+  const [isFullTextSearchMode, setIsFullTextSearchMode] = useState(false);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [hasVimNavigated, setHasVimNavigated] = useState(false);
   const [isUsingVim, setIsUsingVim] = usePersistentState<boolean>("typehere-vim", false);
@@ -739,6 +771,7 @@ function App() {
         themeBeforePreviewRef.current = null;
       }
       setIsThemePickerOpen(false);
+      setIsFullTextSearchMode(false);
     }
   }, [isCmdKMenuOpen]);
 
@@ -753,6 +786,15 @@ function App() {
   const runCmdKSuggestion = (suggestion?: CmdKSuggestion): boolean => {
     if (!suggestion) return true;
     if (suggestion.type === "note") {
+      openNote(suggestion.note.id);
+      return true;
+    } else if (suggestion.type === "noteMatch" || suggestion.type === "noteMoreMatches") {
+      openNote(suggestion.note.id, true, true, {
+        row: suggestion.row,
+        column: suggestion.column,
+      });
+      return true;
+    } else if (suggestion.type === "noteHeader") {
       openNote(suggestion.note.id);
       return true;
     } else if (suggestion.type === "action") {
@@ -1230,11 +1272,145 @@ function App() {
     return fuse.search(cmdKSearchQuery).map((r) => r.item);
   }, [cmdKSearchQuery, currentThemeId]);
 
+  const fullTextSearchResults = useMemo<CmdKSuggestion[]>(() => {
+    const query = cmdKSearchQuery.trim();
+    if (!query) return [];
+
+    const firstSpaceIndex = cmdKSearchQuery.trimStart().search(/\s/);
+    const trimmedLead = cmdKSearchQuery.trimStart();
+    const keyword = firstSpaceIndex === -1 ? trimmedLead : trimmedLead.slice(0, firstSpaceIndex);
+    const rest =
+      firstSpaceIndex === -1 ? "" : trimmedLead.slice(firstSpaceIndex + 1).trim();
+    const keywordLower = keyword.toLowerCase();
+
+    const doesNoteMatchKeyword = (note: Note): boolean => {
+      if (!keyword) return false;
+      const titleLower = getNoteTitle(note).toLowerCase();
+      if (keyword.length >= FULL_TEXT_HIDDEN_KEYWORD_PREFIX_LENGTH) {
+        return titleLower.startsWith(keywordLower);
+      }
+      return titleLower === keywordLower;
+    };
+
+    const notesWithNeedle: { note: Note; needle: string }[] = [];
+    for (const note of database) {
+      if (!note.isHidden) {
+        notesWithNeedle.push({ note, needle: query.toLowerCase() });
+        continue;
+      }
+      if (shouldShowHiddenNotes) {
+        notesWithNeedle.push({ note, needle: query.toLowerCase() });
+        continue;
+      }
+      if (note.id === currentNoteId) {
+        notesWithNeedle.push({ note, needle: query.toLowerCase() });
+        continue;
+      }
+      if (rest && doesNoteMatchKeyword(note)) {
+        notesWithNeedle.push({ note, needle: rest.toLowerCase() });
+      }
+    }
+
+    const sorted = [...notesWithNeedle].sort((a, b) => {
+      if (a.note.id === currentNoteId) return -1;
+      if (b.note.id === currentNoteId) return 1;
+      return new Date(b.note.updatedAt).getTime() - new Date(a.note.updatedAt).getTime();
+    });
+
+    const rows: CmdKSuggestion[] = [];
+    for (const { note, needle } of sorted) {
+      if (!needle) continue;
+      const lines = note.content.split("\n");
+      const matches: {
+        row: number;
+        column: number;
+        lineText: string;
+        matchStart: number;
+        matchEnd: number;
+      }[] = [];
+
+      for (let row = 0; row < lines.length; row++) {
+        const line = lines[row];
+        const lower = line.toLowerCase();
+        let fromIndex = 0;
+        while (fromIndex <= lower.length) {
+          const foundAt = lower.indexOf(needle, fromIndex);
+          if (foundAt === -1) break;
+          matches.push({
+            row,
+            column: foundAt,
+            lineText: line,
+            matchStart: foundAt,
+            matchEnd: foundAt + needle.length,
+          });
+          fromIndex = foundAt + needle.length;
+          if (needle.length === 0) break;
+        }
+      }
+
+      if (matches.length === 0) continue;
+
+      rows.push({ type: "noteHeader", note, matchCount: matches.length });
+
+      const shown = matches.slice(0, FULL_TEXT_MAX_SNIPPETS_PER_NOTE);
+      for (const m of shown) {
+        rows.push({
+          type: "noteMatch",
+          note,
+          row: m.row,
+          column: m.column,
+          lineText: m.lineText,
+          matchStart: m.matchStart,
+          matchEnd: m.matchEnd,
+        });
+      }
+
+      if (matches.length > FULL_TEXT_MAX_SNIPPETS_PER_NOTE) {
+        const next = matches[FULL_TEXT_MAX_SNIPPETS_PER_NOTE];
+        rows.push({
+          type: "noteMoreMatches",
+          note,
+          remaining: matches.length - FULL_TEXT_MAX_SNIPPETS_PER_NOTE,
+          row: next.row,
+          column: next.column,
+        });
+      }
+    }
+
+    return rows;
+  }, [cmdKSearchQuery, database, shouldShowHiddenNotes, currentNoteId]);
+
   const cmdKSuggestions = useMemo<CmdKSuggestion[]>(() => {
     if (isThemePickerOpen) return themeSuggestions;
+    if (isFullTextSearchMode) return fullTextSearchResults;
     const shouldSearchAllNotes = searchAllNotesKeys.some((key) => cmdKSearchQuery.startsWith(key));
     return getAllSuggestions(shouldSearchAllNotes);
-  }, [cmdKSearchQuery, getAllSuggestions, isThemePickerOpen, themeSuggestions]);
+  }, [
+    cmdKSearchQuery,
+    getAllSuggestions,
+    isThemePickerOpen,
+    themeSuggestions,
+    isFullTextSearchMode,
+    fullTextSearchResults,
+  ]);
+
+  useEffect(() => {
+    if (!isCmdKMenuOpen) return;
+    const current = cmdKSuggestions[selectedCmdKSuggestionIndex];
+    if (current?.type !== "noteHeader") return;
+    for (let i = selectedCmdKSuggestionIndex + 1; i < cmdKSuggestions.length; i++) {
+      if (cmdKSuggestions[i].type !== "noteHeader") {
+        setSelectedCmdKSuggestionIndex(i);
+        return;
+      }
+    }
+    for (let i = 0; i < selectedCmdKSuggestionIndex; i++) {
+      if (cmdKSuggestions[i].type !== "noteHeader") {
+        setSelectedCmdKSuggestionIndex(i);
+        return;
+      }
+    }
+  }, [cmdKSuggestions, selectedCmdKSuggestionIndex, isCmdKMenuOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1271,7 +1447,8 @@ function App() {
       }
 
       const currentSuggestion = cmdKSuggestions[selectedCmdKSuggestionIndex];
-      const currentSelectedNote = currentSuggestion.type === "note" ? currentSuggestion.note : null;
+      const currentSelectedNote =
+        currentSuggestion?.type === "note" ? currentSuggestion.note : null;
 
       const vimUp = (e.ctrlKey || e.metaKey) && e.code === "KeyK";
       const vimDown = (e.ctrlKey || e.metaKey) && e.code === "KeyJ";
@@ -1315,20 +1492,31 @@ function App() {
 
         let nextIndex: number | null = null;
         const length = cmdKSuggestions.length;
+        const isSelectableIndex = (idx: number): boolean =>
+          cmdKSuggestions[idx]?.type !== "noteHeader";
+        const stepIndex = (start: number, step: 1 | -1): number => {
+          if (length === 0) return 0;
+          let idx = start;
+          for (let i = 0; i < length; i++) {
+            idx = (idx + step + length) % length;
+            if (isSelectableIndex(idx)) return idx;
+          }
+          return start;
+        };
         if (e.code === "ArrowUp" || vimUp) {
           e.preventDefault();
           if (selectedCmdKSuggestionIndex === null) {
-            nextIndex = length - 1;
+            nextIndex = stepIndex(0, -1);
           } else {
-            nextIndex = (selectedCmdKSuggestionIndex - 1 + length) % length;
+            nextIndex = stepIndex(selectedCmdKSuggestionIndex, -1);
           }
           setSelectedCmdKSuggestionIndex(nextIndex);
         } else if (e.code === "ArrowDown" || vimDown) {
           e.preventDefault();
           if (selectedCmdKSuggestionIndex === null) {
-            nextIndex = 0;
+            nextIndex = isSelectableIndex(0) ? 0 : stepIndex(0, 1);
           } else {
-            nextIndex = (selectedCmdKSuggestionIndex + 1) % length;
+            nextIndex = stepIndex(selectedCmdKSuggestionIndex, 1);
           }
           setSelectedCmdKSuggestionIndex(nextIndex);
         }
@@ -1433,6 +1621,7 @@ function App() {
         setSelectedCmdKSuggestionIndex(0);
         setIsCmdKMenuOpen(true);
         setIsHelpMenuOpen(false);
+        setIsFullTextSearchMode(false);
 
         if (e.shiftKey) {
           setCmdKSearchQuery("@");
@@ -1448,7 +1637,8 @@ function App() {
         setSelectedCmdKSuggestionIndex(0);
         setIsCmdKMenuOpen(true);
         setIsHelpMenuOpen(false);
-        setCmdKSearchQuery("@");
+        setIsFullTextSearchMode(true);
+        setCmdKSearchQuery("");
         return;
       }
 
@@ -2087,7 +2277,7 @@ function App() {
                         <kbd>⇧</kbd>
                         <kbd>f</kbd>
                       </div>
-                      <span>Search all notes</span>
+                      <span>Find in all notes</span>
                     </div>
                     <div className="help-menu-shortcuts-item">
                       <div className="help-menu-shortcuts-keys">
@@ -2280,27 +2470,38 @@ function App() {
                   transform: "translateX(-50%)",
                 }}
               >
-                <input
-                  autoFocus
-                  ref={cmdKInputDomRef}
-                  placeholder={isThemePickerOpen ? "Search themes..." : "Search notes..."}
-                  value={cmdKSearchQuery}
-                  onChange={(e) => {
-                    setCmdKSearchQuery(e.target.value);
-                    setSelectedCmdKSuggestionIndex(0);
-                  }}
-                  style={{
-                    padding: "10px 14px",
-                    outline: "none",
-                    border: "none",
-                    borderBottom: "1px solid var(--border-color)",
-                    borderRadius: 0,
-                    fontSize: "0.85rem",
-                    background: "transparent",
-                    color: "var(--dark-color)",
-                    width: "100%",
-                  }}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    autoFocus
+                    ref={cmdKInputDomRef}
+                    placeholder={
+                      isThemePickerOpen
+                        ? "Search themes..."
+                        : isFullTextSearchMode
+                          ? "Search in all notes..."
+                          : "Search notes..."
+                    }
+                    value={cmdKSearchQuery}
+                    onChange={(e) => {
+                      setCmdKSearchQuery(e.target.value);
+                      setSelectedCmdKSuggestionIndex(0);
+                    }}
+                    style={{
+                      padding: isFullTextSearchMode ? "10px 92px 10px 14px" : "10px 14px",
+                      outline: "none",
+                      border: "none",
+                      borderBottom: "1px solid var(--border-color)",
+                      borderRadius: 0,
+                      fontSize: "0.85rem",
+                      background: "transparent",
+                      color: "var(--dark-color)",
+                      width: "100%",
+                    }}
+                  />
+                  {isFullTextSearchMode && (
+                    <span className="cmdk-ft-chip">all notes</span>
+                  )}
+                </div>
                 <div
                   className="no-scrollbar"
                   onMouseMove={() => {
@@ -2315,6 +2516,116 @@ function App() {
                   }}
                 >
                   {cmdKSuggestions.map((suggestion, index) => {
+                    if (suggestion.type === "noteHeader") {
+                      const note = suggestion.note;
+                      const title = getNoteTitle(note).trim() || "New Note";
+                      return (
+                        <div
+                          key={`ft-header-${note.id}-${index}`}
+                          id={`note-list-cmdk-item-${index}`}
+                          className="cmdk-ft-header"
+                        >
+                          <span className="cmdk-ft-header-title">
+                            {note.isHidden && (
+                              <MdVisibilityOff
+                                style={{
+                                  color: "var(--hidden-color)",
+                                  marginRight: 3,
+                                  fontSize: "0.75rem",
+                                }}
+                              />
+                            )}
+                            {note.isPinned && (
+                              <FaMapPin
+                                style={{
+                                  marginRight: 3,
+                                  color: "var(--pin-color)",
+                                  fontSize: "0.7rem",
+                                }}
+                              />
+                            )}
+                            {title}
+                          </span>
+                          {note.workspace && (
+                            <span className="cmdk-ft-header-workspace">{note.workspace}</span>
+                          )}
+                          <span className="cmdk-ft-header-count">
+                            {suggestion.matchCount} {suggestion.matchCount === 1 ? "match" : "matches"}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (suggestion.type === "noteMatch") {
+                      const { lineText, matchStart, matchEnd, row } = suggestion;
+                      const windowBefore = Math.floor(FULL_TEXT_SNIPPET_WINDOW / 3);
+                      const sliceStart = Math.max(0, matchStart - windowBefore);
+                      const sliceEnd = Math.min(
+                        lineText.length,
+                        sliceStart + FULL_TEXT_SNIPPET_WINDOW
+                      );
+                      const prefix = sliceStart > 0 ? "…" : "";
+                      const suffix = sliceEnd < lineText.length ? "…" : "";
+                      const localStart = matchStart - sliceStart;
+                      const localEnd = matchEnd - sliceStart;
+                      const visible = lineText.slice(sliceStart, sliceEnd);
+                      const before = visible.slice(0, localStart);
+                      const matched = visible.slice(localStart, localEnd);
+                      const after = visible.slice(localEnd);
+                      return (
+                        <div
+                          key={`ft-match-${suggestion.note.id}-${row}-${matchStart}-${index}`}
+                          id={`note-list-cmdk-item-${index}`}
+                          className="cmdk-item cmdk-ft-match"
+                          onClick={() => {
+                            if (runCmdKSuggestion(suggestion)) {
+                              setIsCmdKMenuOpen(false);
+                              setSelectedCmdKSuggestionIndex(0);
+                            }
+                          }}
+                          onMouseEnter={() => {
+                            if (isSuppressingMousePreviewRef.current) return;
+                            setSelectedCmdKSuggestionIndex(index);
+                          }}
+                          data-selected={index === selectedCmdKSuggestionIndex}
+                        >
+                          <span className="cmdk-ft-line-number">{row + 1}</span>
+                          <span className="cmdk-ft-snippet">
+                            {prefix}
+                            {before}
+                            <mark>{matched}</mark>
+                            {after}
+                            {suffix}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    if (suggestion.type === "noteMoreMatches") {
+                      return (
+                        <div
+                          key={`ft-more-${suggestion.note.id}-${index}`}
+                          id={`note-list-cmdk-item-${index}`}
+                          className="cmdk-item cmdk-ft-more"
+                          onClick={() => {
+                            if (runCmdKSuggestion(suggestion)) {
+                              setIsCmdKMenuOpen(false);
+                              setSelectedCmdKSuggestionIndex(0);
+                            }
+                          }}
+                          onMouseEnter={() => {
+                            if (isSuppressingMousePreviewRef.current) return;
+                            setSelectedCmdKSuggestionIndex(index);
+                          }}
+                          data-selected={index === selectedCmdKSuggestionIndex}
+                        >
+                          <span className="cmdk-ft-snippet">
+                            +{suggestion.remaining} more {suggestion.remaining === 1 ? "match" : "matches"}
+                          </span>
+                        </div>
+                      );
+                    }
+
                     if (suggestion.type === "note") {
                       const note = suggestion.note;
                       const title = getNoteTitle(note);
