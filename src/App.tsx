@@ -11,7 +11,9 @@ import isElectron from "is-electron";
 import type { BackupEntry } from "./electron.d";
 import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById } from "./themes";
 import { saveAsset, getAsset, generateAssetId, formatImageRef, restoreSerializedAssets, type SerializedAsset, uploadAssetToCloud, downloadAssetFromCloud, type AssetManifestEntry, IMAGE_REF_REGEX } from "./assets";
+import type { Ace } from "ace-builds";
 import { ImageWidgetManager, type ImageSpotlightOpenPayload } from "./imageWidgets";
+import { tryBuildInlineEqualSuffix } from "./inlineExpressionCalc";
 import { SpotifyWidgetManager, SPOTIFY_URL_REGEX } from "./spotifyWidgets";
 import ImageSpotlight from "./ImageSpotlight";
 import "./App.css";
@@ -1625,6 +1627,28 @@ function App() {
       spotifyWidgetManagerRef.current = spotifyManager;
       spotifyManager.sync();
 
+      const session = editor.getSession();
+      let isInlineEqualInsert = false;
+      const onSessionChange = (_delta: Ace.Delta) => {
+        if (isInlineEqualInsert) return;
+        if (_delta.action !== "insert") return;
+        queueMicrotask(() => {
+          if (isInlineEqualInsert) return;
+          const pos = editor.getCursorPosition();
+          const line = session.getLine(pos.row);
+          const lineToCursor = line.substring(0, pos.column);
+          const insert = tryBuildInlineEqualSuffix(lineToCursor);
+          if (!insert) return;
+          isInlineEqualInsert = true;
+          try {
+            session.insert(pos, insert);
+          } finally {
+            isInlineEqualInsert = false;
+          }
+        });
+      };
+      session.on("change", onSessionChange);
+
       const container = editor.container;
       let dragDepth = 0;
 
@@ -1718,6 +1742,7 @@ function App() {
       container.addEventListener("paste", handlePaste);
 
       return () => {
+        session.removeListener("change", onSessionChange);
         container.removeEventListener("dragenter", handleDragEnter);
         container.removeEventListener("dragover", handleDragOver);
         container.removeEventListener("dragleave", handleDragLeave);
