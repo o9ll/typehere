@@ -10173,10 +10173,84 @@ body.electron .ace_placeholder {
 }
 
 .image-widget {
+  position: relative;
   padding: 8px 0 8px 6px;
+  min-width: 0;
+}
+
+.image-widget-scroll {
   display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   gap: 8px;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.image-widget-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.image-widget-fade {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 36px;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  border: none;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: default;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.image-widget-fade.isVisible {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.image-widget-fade.isVisible:disabled {
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+}
+
+.image-widget-fade-left {
+  left: 6px;
+  background: linear-gradient(to right, var(--note-background-color), transparent);
+}
+
+.electron .image-widget-fade-left {
+  left: 70px;
+}
+
+.image-widget-fade-right {
+  right: 0;
+  width: 40px;
+  background: linear-gradient(to left, var(--note-background-color), transparent);
+}
+
+.image-widget:not(.isScrollable) .image-widget-fade {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.image-widget-fade:focus {
+  outline: none;
+}
+
+.image-widget-fade:focus-visible {
+  outline: 2px solid var(--border-color);
+  outline-offset: 1px;
 }
 
 .electron .image-widget {
@@ -10186,6 +10260,7 @@ body.electron .ace_placeholder {
 .image-widget-thumb {
   position: relative;
   display: inline-block;
+  flex-shrink: 0;
 }
 
 .image-widget-resize-handle {
@@ -10253,6 +10328,7 @@ body.electron .ace_placeholder {
   cursor: pointer;
   animation: spotlight-fade-in 0.15s ease;
   overflow: hidden;
+  outline: none;
 }
 
 .image-spotlight-stage {
@@ -10274,7 +10350,6 @@ body.electron .ace_placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   height: 64px;
   padding: 0 12px 12px;
   cursor: default;
@@ -10284,6 +10359,35 @@ body.electron .ace_placeholder {
 
 .image-spotlight-toolbar > * {
   pointer-events: auto;
+}
+
+.image-spotlight-toolbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.image-spotlight-gallery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-spotlight-index-label {
+  font-family: 'Berkeley Mono', 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.72);
+  min-width: 3.25rem;
+  text-align: center;
+  user-select: none;
+}
+
+.image-spotlight-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .image-spotlight-tool-btn {

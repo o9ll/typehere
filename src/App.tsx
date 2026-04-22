@@ -11,7 +11,7 @@ import isElectron from "is-electron";
 import type { BackupEntry } from "./electron.d";
 import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById } from "./themes";
 import { saveAsset, getAsset, generateAssetId, formatImageRef, restoreSerializedAssets, type SerializedAsset, uploadAssetToCloud, downloadAssetFromCloud, type AssetManifestEntry, IMAGE_REF_REGEX } from "./assets";
-import { ImageWidgetManager } from "./imageWidgets";
+import { ImageWidgetManager, type ImageSpotlightOpenPayload } from "./imageWidgets";
 import { SpotifyWidgetManager, SPOTIFY_URL_REGEX } from "./spotifyWidgets";
 import ImageSpotlight from "./ImageSpotlight";
 import "./App.css";
@@ -1534,7 +1534,7 @@ function App() {
     historyStack,
   ]);
 
-  const [spotlightSrc, setSpotlightSrc] = useState<string | null>(null);
+  const [spotlight, setSpotlight] = useState<ImageSpotlightOpenPayload | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const imageWidgetManagerRef = useRef<ImageWidgetManager | null>(null);
   const spotifyWidgetManagerRef = useRef<SpotifyWidgetManager | null>(null);
@@ -1617,7 +1617,7 @@ function App() {
         enableLiveAutocompletion: true,
       });
 
-      const widgetManager = new ImageWidgetManager(editor, (src) => setSpotlightSrc(src));
+      const widgetManager = new ImageWidgetManager(editor, (payload) => setSpotlight(payload));
       imageWidgetManagerRef.current = widgetManager;
       widgetManager.sync();
 
@@ -2480,8 +2480,12 @@ function App() {
             document.body
           )}
       </main>
-      {spotlightSrc && (
-        <ImageSpotlight src={spotlightSrc} onClose={() => setSpotlightSrc(null)} />
+      {spotlight && (
+        <ImageSpotlight
+          urls={spotlight.urls}
+          startIndex={spotlight.index}
+          onClose={() => setSpotlight(null)}
+        />
       )}
     </>
   );

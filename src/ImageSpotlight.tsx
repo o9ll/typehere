@@ -12,8 +12,16 @@ function clampZoom(z: number): number {
 }
 
 interface ImageSpotlightProps {
-  src: string;
+  urls: string[];
+  startIndex: number;
   onClose: () => void;
+}
+
+function clampGalleryIndex(i: number, length: number): number {
+  if (length < 1) {
+    return 0;
+  }
+  return Math.max(0, Math.min(i, length - 1));
 }
 
 interface Transform {
@@ -24,12 +32,14 @@ interface Transform {
 
 const IDENTITY: Transform = { scale: 1, tx: 0, ty: 0 };
 
-function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
+function ImageSpotlight({ urls, startIndex, onClose }: ImageSpotlightProps) {
+  const [activeIndex, setActiveIndex] = useState(() => clampGalleryIndex(startIndex, urls.length));
   const [transform, setTransform] = useState<Transform>(IDENTITY);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const transformRef = useRef<Transform>(IDENTITY);
   const imgRef = useRef<HTMLImageElement>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const wheelRafRef = useRef(0);
   const wheelEndTimeoutRef = useRef(0);
@@ -46,6 +56,13 @@ function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
     setTransform(next);
     transformRef.current = next;
   }, []);
+
+  useEffect(() => {
+    overlayRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const src = urls[activeIndex] ?? "";
+  const hasGallery = urls.length > 1;
 
   useEffect(() => {
     commit(IDENTITY, false);
@@ -140,16 +157,34 @@ function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
         return;
       }
+      if (urls.length > 1) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveIndex((i) => Math.max(0, i - 1));
+          return;
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveIndex((i) => Math.min(urls.length - 1, i + 1));
+          return;
+        }
+      }
       if (e.key === "0") {
         e.preventDefault();
+        e.stopPropagation();
         commit(IDENTITY, true);
         return;
       }
       if (e.key === "-" || e.key === "_") {
         e.preventDefault();
+        e.stopPropagation();
         const img = imgRef.current;
         if (!img) return;
         const r = img.getBoundingClientRect();
@@ -158,6 +193,7 @@ function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
       }
       if (e.key === "+" || e.key === "=") {
         e.preventDefault();
+        e.stopPropagation();
         const img = imgRef.current;
         if (!img) return;
         const r = img.getBoundingClientRect();
@@ -165,12 +201,15 @@ function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
         return;
       }
     },
-    [onClose, commit, zoomAt]
+    [onClose, commit, zoomAt, urls.length]
   );
 
   useEffect(() => {
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    const opts: AddEventListenerOptions = { capture: true };
+    window.addEventListener("keydown", handleKeyDown, opts);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, opts);
+    };
   }, [handleKeyDown]);
 
   const handleMouseDown = (e: MouseEvent<HTMLImageElement>) => {
@@ -241,6 +280,16 @@ function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
     commit(IDENTITY, true);
   };
 
+  const handleGalleryPrev = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setActiveIndex((i) => Math.max(0, i - 1));
+  };
+
+  const handleGalleryNext = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setActiveIndex((i) => Math.min(urls.length - 1, i + 1));
+  };
+
   const isIdentity = transform.scale === 1 && transform.tx === 0 && transform.ty === 0;
   const zoomLabel = isIdentity ? "—" : `${Math.round(transform.scale * 100)}%`;
 
@@ -251,7 +300,12 @@ function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
   };
 
   return createPortal(
-    <div className="image-spotlight-overlay" onClick={handleOverlayClick}>
+    <div
+      ref={overlayRef}
+      className="image-spotlight-overlay"
+      tabIndex={-1}
+      onClick={handleOverlayClick}
+    >
       <div className="image-spotlight-stage">
         <img
           ref={imgRef}
@@ -269,35 +323,64 @@ function ImageSpotlight({ src, onClose }: ImageSpotlightProps) {
         className="image-spotlight-toolbar"
         onClick={(e) => e.stopPropagation()}
         role="toolbar"
-        aria-label="Image zoom"
+        aria-label="Image viewer"
       >
-        <button
-          type="button"
-          className="image-spotlight-tool-btn"
-          onClick={handleZoomOut}
-          aria-label="Zoom out"
-        >
-          −
-        </button>
-        <span className="image-spotlight-zoom-label" aria-live="polite">
-          {zoomLabel}
-        </span>
-        <button
-          type="button"
-          className="image-spotlight-tool-btn"
-          onClick={handleZoomIn}
-          aria-label="Zoom in"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className="image-spotlight-tool-btn"
-          onClick={handleReset}
-          aria-label="Reset zoom"
-        >
-          Fit
-        </button>
+        <div className="image-spotlight-toolbar-inner">
+          {hasGallery && (
+            <div className="image-spotlight-gallery" role="group" aria-label="Images in this row">
+              <button
+                type="button"
+                className="image-spotlight-tool-btn"
+                onClick={handleGalleryPrev}
+                disabled={activeIndex === 0}
+                aria-label="Previous image"
+              >
+                ‹
+              </button>
+              <span className="image-spotlight-index-label" aria-live="polite">
+                {activeIndex + 1} / {urls.length}
+              </span>
+              <button
+                type="button"
+                className="image-spotlight-tool-btn"
+                onClick={handleGalleryNext}
+                disabled={activeIndex === urls.length - 1}
+                aria-label="Next image"
+              >
+                ›
+              </button>
+            </div>
+          )}
+          <div className="image-spotlight-zoom" role="group" aria-label="Zoom">
+            <button
+              type="button"
+              className="image-spotlight-tool-btn"
+              onClick={handleZoomOut}
+              aria-label="Zoom out"
+            >
+              −
+            </button>
+            <span className="image-spotlight-zoom-label" aria-live="polite">
+              {zoomLabel}
+            </span>
+            <button
+              type="button"
+              className="image-spotlight-tool-btn"
+              onClick={handleZoomIn}
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="image-spotlight-tool-btn"
+              onClick={handleReset}
+              aria-label="Reset zoom"
+            >
+              Fit
+            </button>
+          </div>
+        </div>
       </div>
     </div>,
     document.body
