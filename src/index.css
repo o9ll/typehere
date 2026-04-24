@@ -10140,10 +10140,10 @@ input {
 .backup-list-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 8px 14px;
   border-bottom: 1px solid var(--border-color);
-  gap: 12px;
+  gap: 10px;
 }
 
 .backup-list-row:last-child {
@@ -10153,9 +10153,10 @@ input {
 .backup-list-label {
   font-size: 0.78rem;
   color: var(--dark-color);
-  opacity: 0.75;
+  opacity: 0.9;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
+  min-width: 72px;
 }
 
 .backup-list-meta {
@@ -10163,6 +10164,15 @@ input {
   color: var(--dark-color);
   opacity: 0.35;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.backup-list-date {
+  opacity: 0.45;
+}
+
+.backup-list-row .backup-list-meta:not(.backup-list-date) {
+  margin-left: auto;
 }
 
 .backup-restore-btn {

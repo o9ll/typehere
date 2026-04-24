@@ -24,6 +24,56 @@ const textsToReplace: [string | RegExp, string][] = [
   ["+-", "±"],
 ];
 
+const parseBackupDate = (iso: string, fallbackLabel: string): Date | null => {
+  if (iso) {
+    const d = new Date(iso);
+    if (!isNaN(d.getTime())) return d;
+  }
+  const match = fallbackLabel.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, y, mo, d, h, mi, s] = match;
+    return new Date(
+      Number(y),
+      Number(mo) - 1,
+      Number(d),
+      Number(h),
+      Number(mi),
+      Number(s)
+    );
+  }
+  return null;
+};
+
+const formatRelativeTime = (date: Date): string => {
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return "just now";
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 45) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+};
+
+const formatBackupShortDate = (date: Date): string => {
+  const now = new Date();
+  const isSameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(isSameYear ? {} : { year: "numeric" }),
+  });
+};
+
 interface Snippet {
   name: string;
   description: string;
@@ -2805,15 +2855,24 @@ function App() {
                       <span className="backup-list-meta">no backups yet</span>
                     </div>
                   ) : (
-                    backupList.map((entry) => (
-                      <div key={entry.key} className="backup-list-row">
-                        <span className="backup-list-label">{entry.label}</span>
-                        <span className="backup-list-meta">{(entry.size / 1024).toFixed(1)}kb</span>
-                        <button className="backup-restore-btn" onClick={() => restoreBackup(entry.key)}>
-                          restore
-                        </button>
-                      </div>
-                    ))
+                    backupList.map((entry) => {
+                      const date = parseBackupDate(entry.lastModified, entry.label);
+                      const relative = date ? formatRelativeTime(date) : entry.label;
+                      const absoluteShort = date ? formatBackupShortDate(date) : "";
+                      const absoluteFull = date ? date.toLocaleString() : entry.label;
+                      return (
+                        <div key={entry.key} className="backup-list-row" title={absoluteFull}>
+                          <span className="backup-list-label">{relative}</span>
+                          {absoluteShort && (
+                            <span className="backup-list-meta backup-list-date">{absoluteShort}</span>
+                          )}
+                          <span className="backup-list-meta">{(entry.size / 1024).toFixed(1)}kb</span>
+                          <button className="backup-restore-btn" onClick={() => restoreBackup(entry.key)}>
+                            restore
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
