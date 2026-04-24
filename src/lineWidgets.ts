@@ -10,6 +10,16 @@ export interface LineWidget {
   pixelHeight?: number;
   session?: Ace.EditSession;
   _inDocument?: boolean;
+  $oldWidget?: LineWidget;
+}
+
+interface AceSessionInternals {
+  lineWidgets?: Array<LineWidget | undefined>;
+  _emit: (event: string, data: Record<string, unknown>) => void;
+  widgetManager: WidgetManagerApi & {
+    $updateRows: () => void;
+    onWidgetChanged: (widget: LineWidget) => void;
+  };
 }
 
 export interface RowEntry<TRef> {
@@ -134,15 +144,12 @@ export abstract class LineWidgetManager<TRef> {
   private _relocateRow(oldMapKey: number, newRow: number, indent: number) {
     const entry = this._rows.get(oldMapKey);
     if (!entry) return;
-    const wm = this._editor.session.widgetManager as WidgetManagerApi;
-    wm.removeLineWidget(entry.widget);
-    entry.widget.row = newRow;
+    this._moveWidgetInPlace(entry.widget, newRow);
     if (indent > 0) {
       entry.widget.el.style.marginLeft = `${indent * this._editor.renderer.characterWidth}px`;
     } else {
       entry.widget.el.style.marginLeft = "";
     }
-    wm.addLineWidget(entry.widget);
     this._rows.delete(oldMapKey);
     const line = this._editor.session.getLine(newRow);
     const refs = this._parseRefs(line);
@@ -150,6 +157,39 @@ export abstract class LineWidgetManager<TRef> {
     entry.refKey = this._refKey(refs);
     entry.refs = refs;
     this._rows.set(newRow, entry);
+  }
+
+  private _moveWidgetInPlace(widget: LineWidget, newRow: number) {
+    const oldRow = widget.row;
+    if (oldRow === newRow) return;
+
+    const session = this._editor.session as unknown as AceSessionInternals;
+    const lineWidgets = session.lineWidgets;
+    if (!lineWidgets) return;
+
+    const headAtOld = lineWidgets[oldRow];
+    if (headAtOld === widget) {
+      lineWidgets[oldRow] = widget.$oldWidget;
+    } else {
+      let cur = headAtOld;
+      while (cur) {
+        if (cur.$oldWidget === widget) {
+          cur.$oldWidget = widget.$oldWidget;
+          break;
+        }
+        cur = cur.$oldWidget;
+      }
+    }
+
+    const existing = lineWidgets[newRow];
+    widget.$oldWidget = existing;
+    lineWidgets[newRow] = widget;
+    widget.row = newRow;
+
+    session._emit("changeFold", { data: { start: { row: oldRow } } });
+    session._emit("changeFold", { data: { start: { row: newRow } } });
+    session.widgetManager.$updateRows();
+    session.widgetManager.onWidgetChanged(widget);
   }
 
   private _removeRow(row: number) {
