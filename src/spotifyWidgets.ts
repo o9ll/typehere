@@ -46,7 +46,7 @@ export class SpotifyWidgetManager extends LineWidgetManager<SpotifyRef> {
     return r * 0.299 + g * 0.587 + b * 0.114 < 128;
   }
 
-  protected async _addRow(row: number, refs: SpotifyRef[], indent: number) {
+  protected async _addRow(row: number, refs: SpotifyRef[], indent: number, syncVersion: number) {
     const container = document.createElement("div");
     container.className = "spotify-widget";
     if (indent > 0) {
@@ -74,6 +74,7 @@ export class SpotifyWidgetManager extends LineWidgetManager<SpotifyRef> {
       container.appendChild(iframe);
     }
 
+    if (!this._isCurrentSync(syncVersion)) return;
     this._registerRow(row, refs, indent, widget);
 
     requestAnimationFrame(() => {

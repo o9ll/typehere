@@ -1784,6 +1784,10 @@ function App() {
   currentNoteIdRef.current = currentNoteId;
 
   useEffect(() => {
+    setSpotlight(null);
+  }, [currentNoteId]);
+
+  useEffect(() => {
     if (textareaDomRef.current) {
       textareaDomRef.current.focus();
     }

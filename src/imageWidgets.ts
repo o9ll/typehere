@@ -212,7 +212,7 @@ export class ImageWidgetManager extends LineWidgetManager<ImageRef> {
     wrapper.appendChild(handle);
   }
 
-  protected async _addRow(row: number, refs: ImageRef[], indent: number) {
+  protected async _addRow(row: number, refs: ImageRef[], indent: number, syncVersion: number) {
     const shell = document.createElement("div");
     shell.className = "image-widget";
     if (indent > 0) {
@@ -237,6 +237,7 @@ export class ImageWidgetManager extends LineWidgetManager<ImageRef> {
     let hasImages = false;
     for (const ref of refs) {
       const objectUrl = await this._getObjectUrl(ref.id);
+      if (!this._isCurrentSync(syncVersion)) return;
       if (!objectUrl) continue;
 
       hasImages = true;
@@ -270,6 +271,7 @@ export class ImageWidgetManager extends LineWidgetManager<ImageRef> {
       scrollEl.appendChild(wrapper);
     }
 
+    if (!this._isCurrentSync(syncVersion)) return;
     if (!hasImages) return;
 
     syncScrollChrome = this._attachImageWidgetChrome(scrollEl, shell, widget);

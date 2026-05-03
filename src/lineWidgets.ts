@@ -38,6 +38,7 @@ export abstract class LineWidgetManager<TRef> {
   protected _editor: Ace.Editor;
   protected _rows: Map<number, RowEntry<TRef>> = new Map();
   private _syncPending = false;
+  private _syncVersion = 0;
   protected _skipNextSync = false;
 
   constructor(editor: Ace.Editor) {
@@ -46,8 +47,17 @@ export abstract class LineWidgetManager<TRef> {
 
   protected abstract _parseRefs(line: string): TRef[];
   protected abstract _refKey(refs: TRef[]): string;
-  protected abstract _addRow(row: number, refs: TRef[], indent: number): Promise<void>;
+  protected abstract _addRow(
+    row: number,
+    refs: TRef[],
+    indent: number,
+    syncVersion: number
+  ): Promise<void>;
   protected _onDestroy(): void {}
+
+  protected _isCurrentSync(syncVersion: number): boolean {
+    return syncVersion === this._syncVersion;
+  }
 
   protected _cacheKey(refs: TRef[], indent: number): string {
     return `${indent}|${this._refKey(refs)}`;
@@ -69,6 +79,8 @@ export abstract class LineWidgetManager<TRef> {
   }
 
   async sync() {
+    const syncVersion = ++this._syncVersion;
+
     if (this._skipNextSync) {
       this._skipNextSync = false;
       return;
@@ -123,7 +135,10 @@ export abstract class LineWidgetManager<TRef> {
 
     for (const [row, { refs, indent }] of desired) {
       if (!this._rows.has(row)) {
-        await this._addRow(row, refs, indent);
+        await this._addRow(row, refs, indent, syncVersion);
+        if (!this._isCurrentSync(syncVersion)) {
+          return;
+        }
       }
     }
   }
@@ -212,6 +227,7 @@ export abstract class LineWidgetManager<TRef> {
   }
 
   clear() {
+    this._syncVersion++;
     for (const row of [...this._rows.keys()]) {
       this._removeRow(row);
     }
