@@ -174,45 +174,73 @@ export abstract class LineWidgetManager<TRef> {
     this._rows.set(newRow, entry);
   }
 
-  private _moveWidgetInPlace(widget: LineWidget, newRow: number) {
-    const oldRow = widget.row;
-    if (oldRow === newRow) return;
-
+  private _unlinkFromAceArray(widget: LineWidget): number {
     const session = this._editor.session as unknown as AceSessionInternals;
     const lineWidgets = session.lineWidgets;
-    if (!lineWidgets) return;
-
-    const headAtOld = lineWidgets[oldRow];
-    if (headAtOld === widget) {
-      lineWidgets[oldRow] = widget.$oldWidget;
-    } else {
-      let cur = headAtOld;
+    if (!lineWidgets) return -1;
+    let foundAt = -1;
+    for (let i = 0; i < lineWidgets.length; i++) {
+      const head = lineWidgets[i];
+      if (!head) continue;
+      if (head === widget) {
+        lineWidgets[i] = widget.$oldWidget;
+        foundAt = i;
+        continue;
+      }
+      let cur: LineWidget | undefined = head;
       while (cur) {
         if (cur.$oldWidget === widget) {
           cur.$oldWidget = widget.$oldWidget;
+          if (foundAt === -1) foundAt = i;
           break;
         }
         cur = cur.$oldWidget;
       }
     }
+    return foundAt;
+  }
+
+  private _moveWidgetInPlace(widget: LineWidget, newRow: number) {
+    const session = this._editor.session as unknown as AceSessionInternals;
+    const lineWidgets = session.lineWidgets;
+    if (!lineWidgets) return;
+
+    const oldRow = widget.row;
+    this._unlinkFromAceArray(widget);
 
     const existing = lineWidgets[newRow];
     widget.$oldWidget = existing;
     lineWidgets[newRow] = widget;
     widget.row = newRow;
 
-    session._emit("changeFold", { data: { start: { row: oldRow } } });
+    if (oldRow !== newRow) {
+      session._emit("changeFold", { data: { start: { row: oldRow } } });
+    }
     session._emit("changeFold", { data: { start: { row: newRow } } });
     session.widgetManager.$updateRows();
     session.widgetManager.onWidgetChanged(widget);
   }
 
+  private _detachWidget(widget: LineWidget) {
+    const foundAt = this._unlinkFromAceArray(widget);
+    widget.$oldWidget = undefined;
+    widget._inDocument = false;
+    widget.session = undefined;
+    if (widget.el && widget.el.parentNode) {
+      widget.el.parentNode.removeChild(widget.el);
+    }
+    return foundAt;
+  }
+
   private _removeRow(row: number) {
     const entry = this._rows.get(row);
     if (!entry) return;
-    const wm = this._editor.session.widgetManager as WidgetManagerApi;
-    wm.removeLineWidget(entry.widget);
+    const session = this._editor.session as unknown as AceSessionInternals;
+    const detachedAt = this._detachWidget(entry.widget);
     this._rows.delete(row);
+    const emitRow = detachedAt >= 0 ? detachedAt : row;
+    session._emit("changeFold", { data: { start: { row: emitRow } } });
+    session.widgetManager.$updateRows();
   }
 
   protected _registerRow(row: number, refs: TRef[], indent: number, widget: LineWidget) {
@@ -228,9 +256,15 @@ export abstract class LineWidgetManager<TRef> {
 
   clear() {
     this._syncVersion++;
-    for (const row of [...this._rows.keys()]) {
-      this._removeRow(row);
+    if (this._rows.size === 0) return;
+    const session = this._editor.session as unknown as AceSessionInternals;
+    for (const entry of this._rows.values()) {
+      this._detachWidget(entry.widget);
     }
+    this._rows.clear();
+    session._emit("changeFold", { data: { start: { row: 0 } } });
+    session.widgetManager.$updateRows();
+    this._editor.renderer.updateFull();
   }
 
   destroy() {
