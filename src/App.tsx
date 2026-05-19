@@ -15,6 +15,7 @@ import type { Ace } from "ace-builds";
 import { ImageWidgetManager, type ImageSpotlightOpenPayload } from "./imageWidgets";
 import { tryBuildInlineEqualSuffix } from "./inlineExpressionCalc";
 import { SpotifyWidgetManager, SPOTIFY_URL_REGEX } from "./spotifyWidgets";
+import { TimeWidgetManager } from "./timeWidgets";
 import ImageSpotlight from "./ImageSpotlight";
 import "./App.css";
 
@@ -658,11 +659,14 @@ function App() {
   useEffect(() => {
     const imgManager = imageWidgetManagerRef.current;
     const spotifyManager = spotifyWidgetManagerRef.current;
+    const timeManager = timeWidgetManagerRef.current;
     if (imgManager) imgManager.clear();
     if (spotifyManager) spotifyManager.clear();
+    timeManager?.reset();
     const id = setTimeout(() => {
       imgManager?.sync();
       spotifyManager?.sync();
+      timeManager?.reset();
     }, 50);
     return () => clearTimeout(id);
   }, [currentNoteId]);
@@ -1780,6 +1784,7 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const imageWidgetManagerRef = useRef<ImageWidgetManager | null>(null);
   const spotifyWidgetManagerRef = useRef<SpotifyWidgetManager | null>(null);
+  const timeWidgetManagerRef = useRef<TimeWidgetManager | null>(null);
   const currentNoteIdRef = useRef(currentNoteId);
   currentNoteIdRef.current = currentNoteId;
 
@@ -1870,6 +1875,10 @@ function App() {
       const spotifyManager = new SpotifyWidgetManager(editor);
       spotifyWidgetManagerRef.current = spotifyManager;
       spotifyManager.sync();
+
+      const timeManager = new TimeWidgetManager(editor);
+      timeWidgetManagerRef.current = timeManager;
+      timeManager.sync();
 
       const session = editor.getSession();
       let isInlineEqualInsert = false;
@@ -1996,6 +2005,8 @@ function App() {
         imageWidgetManagerRef.current = null;
         spotifyManager.destroy();
         spotifyWidgetManagerRef.current = null;
+        timeManager.destroy();
+        timeWidgetManagerRef.current = null;
       };
     }
   }, []);
@@ -2253,6 +2264,7 @@ function App() {
               saveNote(currentNoteId, newText);
               imageWidgetManagerRef.current?.scheduleSync();
               spotifyWidgetManagerRef.current?.scheduleSync();
+              timeWidgetManagerRef.current?.scheduleSync();
             }}
             setOptions={{
               showLineNumbers: false,

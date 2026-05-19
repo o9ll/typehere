@@ -10599,3 +10599,118 @@ body.electron .ace_placeholder {
   font-size: 0.85rem;
   color: var(--dark-color, #888);
 }
+
+.time-widget-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 4;
+  contain: layout style;
+}
+
+.time-widget {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: var(--time-widget-line-height, 1.5em);
+  display: inline-flex;
+  align-items: center;
+  padding-left: 8px;
+  pointer-events: none;
+  will-change: transform;
+  opacity: 0.92;
+}
+
+.time-widget-sky {
+  display: block;
+  border-radius: 2.5px;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+  pointer-events: auto;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.time-widget-sky:hover {
+  transform: translateY(-0.5px);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.time-widget-tooltip-host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  will-change: transform;
+}
+
+.time-widget-tooltip-host.isVisible {
+  opacity: 1;
+}
+
+.time-widget-tooltip {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--note-background-color, #1a1a1a);
+  color: var(--dark-color, #e0e0e0);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.28),
+    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  font-family: 'Berkeley Mono', 'JetBrains Mono', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+  min-width: 200px;
+}
+
+.time-widget-tooltip-headline {
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+
+.time-widget-tooltip-year {
+  position: relative;
+  height: 8px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #7aa7d6 0%,
+    #7aa7d6 17%,
+    #6fbb6f 25%,
+    #6fbb6f 42%,
+    #e8c049 50%,
+    #e8c049 67%,
+    #d97a2a 75%,
+    #d97a2a 92%,
+    #7aa7d6 100%
+  );
+  box-shadow:
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.time-widget-tooltip-year-marker {
+  position: absolute;
+  top: -1.5px;
+  bottom: -1.5px;
+  width: 2px;
+  margin-left: -1px;
+  background: #ffffff;
+  border-radius: 1px;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.6);
+}
+
+.time-widget-tooltip-footer {
+  margin-top: 5px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.62;
+}

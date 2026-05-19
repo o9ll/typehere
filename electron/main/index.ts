@@ -112,6 +112,23 @@ async function createWindow() {
     return { action: "deny" };
   });
 
+  win.webContents.on("before-input-event", (_event, input) => {
+    const isNativeFullscreenShortcut =
+      input.type === "keyDown" &&
+      input.code === "KeyF" &&
+      input.control &&
+      input.meta &&
+      !input.shift &&
+      !input.alt &&
+      !input.isAutoRepeat;
+
+    if (isNativeFullscreenShortcut && win) {
+      _event.preventDefault();
+      const isNextFullScreen = !win.isFullScreen();
+      win.setFullScreen(isNextFullScreen);
+    }
+  });
+
   win.on("close", () => {
     if (win) {
       store.set("windowBounds", win.getBounds());
