@@ -1083,18 +1083,18 @@ function App() {
             return true;
           },
         },
-        {
-          type: "action",
-          title: "backup all notes",
-          content: "to cloud",
-          color: "#FFEB3B",
-          onAction: () => {
-            createCloudBackup();
-            return true;
-          },
-        },
         ...(window.electronBackup
           ? [
+              {
+                type: cmdKSuggestionActionType,
+                title: "backup all notes",
+                content: "to cloud",
+                color: "#FFEB3B",
+                onAction: () => {
+                  createCloudBackup();
+                  return true;
+                },
+              },
               {
                 type: cmdKSuggestionActionType,
                 title: "open cloud backups",
@@ -2448,25 +2448,29 @@ function App() {
                   <span className="more-menu-label">theme: {currentTheme.name.toLowerCase()}</span>
                 </button>
                 <div className="more-menu-divider" />
-                <button
-                  onClick={() => {
-                    setMoreMenuPosition(null);
-                    createCloudBackup();
-                  }}
-                  disabled={isBackingUp}
-                >
-                  <span className="more-menu-check" />
-                  <span className="more-menu-label">{isBackingUp ? "backing up..." : "backup"}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setMoreMenuPosition(null);
-                    openBackupList();
-                  }}
-                >
-                  <span className="more-menu-check" />
-                  <span className="more-menu-label">backups</span>
-                </button>
+                {window.electronBackup && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setMoreMenuPosition(null);
+                        createCloudBackup();
+                      }}
+                      disabled={isBackingUp}
+                    >
+                      <span className="more-menu-check" />
+                      <span className="more-menu-label">{isBackingUp ? "backing up..." : "backup"}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoreMenuPosition(null);
+                        openBackupList();
+                      }}
+                    >
+                      <span className="more-menu-check" />
+                      <span className="more-menu-label">backups</span>
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => {
                     setMoreMenuPosition(null);
