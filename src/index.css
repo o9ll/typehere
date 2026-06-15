@@ -45,26 +45,49 @@
   --cursor-block-color: rgba(0, 0, 0, 0.2);
 }
 
+:root[data-theme='typehere-dark'] {
+  --border-color: #2a2a2e;
+  --hover-background-color: #1f1f23;
+  --note-background-color: #09090b;
+  --note-selected-background-color: #27272a;
+  --delete-btn-background-color: #ef4444;
+  --delete-btn-hover-background-color: #dc2626;
+  --timestamp-color: #a1a1aa;
+  --overlay-background-color: rgba(0, 0, 0, 0.75);
+  --box-shadow-color: rgba(0, 0, 0, 0.35);
+  --untitled-note-title-color: #71717a99;
+  --keyboard-key-color: rgba(24, 24, 27, 0.9);
+  --dark-color: #fafafa;
+  --secondary-dark-color: #52525b;
+  --light-color: #09090b;
+  --on-fill-color: #fafafa;
+  --pin-color: #f59e0b;
+  --hidden-color: #38bdf878;
+  --cursor-color: #fafafa;
+  --cursor-block-color: rgba(250, 250, 250, 0.25);
+  --accent-color: #a78bfa;
+}
+
 :root[data-theme='dark'] {
-  --border-color: #555555;
-  --hover-background-color: #333333;
-  --note-background-color: #222222;
-  --note-selected-background-color: #555555;
-  --delete-btn-background-color: #fe3f3f;
-  --delete-btn-hover-background-color: #ff2020;
-  --timestamp-color: #cccccc;
-  --overlay-background-color: rgba(0, 0, 0, 0.7);
-  --box-shadow-color: rgba(0, 0, 0, 0.2);
-  --untitled-note-title-color: #99999966;
-  --keyboard-key-color: rgba(40, 40, 33, 0.836);
-  --dark-color: #ffffff;
-  --secondary-dark-color: #555555;
-  --light-color: #121212;
-  --on-fill-color: #ffffff;
-  --pin-color: #fda403;
-  --hidden-color: #5fb2ee78;
-  --cursor-color: white;
-  --cursor-block-color: rgba(255, 255, 255, 0.3);
+  --border-color: #3f3f46;
+  --hover-background-color: #27272a;
+  --note-background-color: #18181b;
+  --note-selected-background-color: #3f3f46;
+  --delete-btn-background-color: #f87171;
+  --delete-btn-hover-background-color: #ef4444;
+  --timestamp-color: #a1a1aa;
+  --overlay-background-color: rgba(0, 0, 0, 0.72);
+  --box-shadow-color: rgba(0, 0, 0, 0.28);
+  --untitled-note-title-color: #71717a99;
+  --keyboard-key-color: rgba(24, 24, 27, 0.88);
+  --dark-color: #f4f4f5;
+  --secondary-dark-color: #52525b;
+  --light-color: #18181b;
+  --on-fill-color: #fafafa;
+  --pin-color: #fbbf24;
+  --hidden-color: #38bdf878;
+  --cursor-color: #f4f4f5;
+  --cursor-block-color: rgba(244, 244, 245, 0.28);
 }
 
 :root[data-theme='paper'] {
@@ -9904,6 +9927,42 @@ input {
 .cmdk-ft-header:first-child {
   border-top: none;
   margin-top: 0;
+}
+
+.cmdk-section-label {
+  padding: 8px 10px 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dark-color);
+  opacity: 0.45;
+  user-select: none;
+  cursor: default;
+}
+
+.cmdk-section-label:not(:first-child) {
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+main.focus-mode #controls {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+main.focus-mode #controls:hover,
+main.focus-mode #controls:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+#controls {
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .cmdk-ft-header-title {

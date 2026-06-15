@@ -6,10 +6,11 @@ type Theme = {
 };
 
 const THEMES: Theme[] = [
+  { id: "typehere-dark", name: "Type Here", isDark: true, accentColor: "#a78bfa" },
   { id: "light", name: "Light", isDark: false, accentColor: "#666666" },
   { id: "paper", name: "Paper", isDark: false, accentColor: "#7a6e61" },
   { id: "sepia", name: "Sepia", isDark: false, accentColor: "#7a6b57" },
-  { id: "dark", name: "Dark", isDark: true, accentColor: "#cccccc" },
+  { id: "dark", name: "Dark", isDark: true, accentColor: "#a1a1aa" },
   { id: "0x96f", name: "0x96f", isDark: true, accentColor: "#00cde8" },
   { id: "12-bit-rainbow", name: "12-bit Rainbow", isDark: true, accentColor: "#3060b0" },
   { id: "3024-day", name: "3024 Day", isDark: false, accentColor: "#01a0e4" },
@@ -486,5 +487,18 @@ function getThemeById(id: string): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0];
 }
 
+const RECOMMENDED_THEME_IDS = [
+  "typehere-dark",
+  "catppuccin-mocha",
+  "tokyonight-night",
+  "rose-pine-moon",
+  "github-dark-default",
+  "nord",
+] as const;
+
+function getRecommendedThemes(): Theme[] {
+  return RECOMMENDED_THEME_IDS.map((id) => getThemeById(id));
+}
+
 export type { Theme };
-export { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById };
+export { THEMES, RECOMMENDED_THEME_IDS, applyThemeToDocument, restoreThemeFromCache, getThemeById, getRecommendedThemes };

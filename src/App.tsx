@@ -9,7 +9,7 @@ import { MdVisibilityOff } from "react-icons/md";
 import { FiMoreHorizontal } from "react-icons/fi";
 import isElectron from "is-electron";
 import type { BackupEntry } from "./electron.d";
-import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById } from "./themes";
+import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById, getRecommendedThemes } from "./themes";
 import { saveAsset, getAsset, generateAssetId, formatImageRef, restoreSerializedAssets, type SerializedAsset, uploadAssetToCloud, downloadAssetFromCloud, type AssetManifestEntry, IMAGE_REF_REGEX } from "./assets";
 import type { Ace } from "ace-builds";
 import { ImageWidgetManager, type ImageSpotlightOpenPayload } from "./imageWidgets";
@@ -455,6 +455,10 @@ type CmdKSuggestion =
       column: number;
     }
   | {
+      type: "section";
+      title: string;
+    }
+  | {
       type: "action";
       title: string;
       content: string;
@@ -483,8 +487,9 @@ const freshDatabase = [
 
 const themeId = "typehere-theme";
 if (!restoreThemeFromCache()) {
-  if (localStorage.getItem(themeId) === '"dark"') {
-    document.documentElement.setAttribute("data-theme", "dark");
+  const legacy = localStorage.getItem(themeId);
+  if (legacy === '"dark"') {
+    document.documentElement.setAttribute("data-theme", "typehere-dark");
   }
 }
 
@@ -776,13 +781,14 @@ function App() {
 
   const fileInputDomRef = useRef<HTMLInputElement>(null);
 
-  const [currentThemeId, setCurrentThemeId] = usePersistentState<string>(themeId, "light");
+  const [currentThemeId, setCurrentThemeId] = usePersistentState<string>(themeId, "typehere-dark");
   const currentTheme = getThemeById(currentThemeId);
   const [selectedCmdKSuggestionIndex, setSelectedCmdKSuggestionIndex] = useState<number>(0);
   const [cmdKSearchQuery, setCmdKSearchQuery] = useState("");
   const [isCmdKMenuOpen, setIsCmdKMenuOpen] = useState(false);
   const [isFullTextSearchMode, setIsFullTextSearchMode] = useState(false);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
+  const [isFocusMode, setIsFocusMode] = usePersistentState<boolean>("typehere-focus", false);
   const [hasVimNavigated, setHasVimNavigated] = useState(false);
   const [isUsingVim, setIsUsingVim] = usePersistentState<boolean>("typehere-vim", false);
   const [isNarrowScreen, setIsNarrowScreen] = usePersistentState<boolean>("typehere-narrow", false);
@@ -799,6 +805,11 @@ function App() {
   const saveTheme = (id: string) => {
     setCurrentThemeId(id);
     applyThemeToDocument(getThemeById(id));
+  };
+
+  const openThemePicker = () => {
+    setIsThemePickerOpen(true);
+    setCmdKSearchQuery("");
   };
 
   const previewThemeForSuggestion = (suggestion?: CmdKSuggestion) => {
@@ -939,6 +950,63 @@ function App() {
     note.isHidden = isHidden;
     setDatabase(sortNotes([...database.filter((n) => n.id !== note.id), note]));
   };
+
+  const recommendationSuggestions = useMemo<CmdKSuggestion[]>(
+    () => [
+      {
+        type: cmdKSuggestionActionType,
+        title: isFocusMode ? "exit focus mode" : "enter focus mode",
+        content: "hide status bar for distraction-free writing",
+        color: "#C4B5FD",
+        onAction: () => {
+          setIsFocusMode(!isFocusMode);
+          return true;
+        },
+      },
+      {
+        type: cmdKSuggestionActionType,
+        title: "choose theme",
+        content: `current: ${currentTheme.name.toLowerCase()}`,
+        color: currentTheme.accentColor,
+        onAction: () => {
+          openThemePicker();
+          return false;
+        },
+      },
+      {
+        type: cmdKSuggestionActionType,
+        title: "toggle vim mode",
+        content: "turn " + (isUsingVim ? "off" : "on") + " vim mode",
+        color: "#81D4FA",
+        onAction: () => {
+          setIsUsingVim(!isUsingVim);
+          return true;
+        },
+      },
+      {
+        type: cmdKSuggestionActionType,
+        title: "toggle narrow screen mode",
+        content: "enter " + (isNarrowScreen ? "wide" : "narrow") + " screen mode",
+        color: "#AED581",
+        onAction: () => {
+          setIsNarrowScreen(!isNarrowScreen);
+          return true;
+        },
+      },
+      {
+        type: cmdKSuggestionActionType,
+        title: "keyboard shortcuts",
+        content: "view all shortcuts",
+        color: "#B2B2FF",
+        onAction: () => {
+          setIsHelpMenuOpen(true);
+          return true;
+        },
+      },
+    ],
+    [currentTheme, currentThemeId, isFocusMode, isNarrowScreen, isUsingVim]
+  );
+
   const getAllSuggestions = useCallback(
     (shouldSearchAllNotes = false): CmdKSuggestion[] => {
       const processedCmdKSearchQuery =
@@ -1031,14 +1099,18 @@ function App() {
           content: `current: ${currentTheme.name.toLowerCase()}`,
           color: currentTheme.accentColor,
           onAction: () => {
-            setIsThemePickerOpen(true);
-            setCmdKSearchQuery("");
-            const idx = THEMES.findIndex((t) => t.id === currentThemeId);
-            setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
-            setTimeout(() => {
-              document.getElementById(`note-list-cmdk-item-${idx}`)?.scrollIntoView({ block: "center" });
-            });
+            openThemePicker();
             return false;
+          },
+        },
+        {
+          type: "action",
+          title: isFocusMode ? "exit focus mode" : "enter focus mode",
+          content: "hide status bar for distraction-free writing",
+          color: "#C4B5FD",
+          onAction: () => {
+            setIsFocusMode(!isFocusMode);
+            return true;
           },
         },
         {
@@ -1290,6 +1362,9 @@ function App() {
       }
 
       return [
+        ...(!processedCmdKSearchQuery && !shouldSearchAllNotes
+          ? [{ type: "section" as const, title: "recommendations" }, ...recommendationSuggestions]
+          : []),
         ...matchingHiddenNotes.map((note) => ({
           type: "note" as const,
           note,
@@ -1302,11 +1377,11 @@ function App() {
         ...actions,
       ];
     },
-    [database, cmdKSearchQuery, workspaceNotes, currentNoteId]
+    [database, cmdKSearchQuery, workspaceNotes, currentNoteId, recommendationSuggestions]
   );
 
   const themeSuggestions = useMemo<CmdKSuggestion[]>(() => {
-    const all: CmdKSuggestion[] = THEMES.map((t) => ({
+    const toThemeAction = (t: (typeof THEMES)[number]): CmdKSuggestion => ({
       type: cmdKSuggestionActionType,
       title: `${t.name}${currentThemeId === t.id ? " (current)" : ""}`,
       content: `${t.name} ${t.isDark ? "dark" : "light"} theme`,
@@ -1317,14 +1392,41 @@ function App() {
         saveTheme(t.id);
         return true;
       },
-    }));
-    if (!cmdKSearchQuery) return all;
-    const fuse = new Fuse(all, {
-      keys: ["title", "content"],
-      threshold: 0.4,
     });
-    return fuse.search(cmdKSearchQuery).map((r) => r.item);
+
+    if (cmdKSearchQuery) {
+      const searchable = THEMES.map(toThemeAction);
+      const fuse = new Fuse(searchable, {
+        keys: ["title", "content"],
+        threshold: 0.4,
+      });
+      return fuse.search(cmdKSearchQuery).map((r) => r.item);
+    }
+
+    const recommended = getRecommendedThemes();
+    const recommendedIds = new Set(recommended.map((t) => t.id));
+    const otherThemes = THEMES.filter((t) => !recommendedIds.has(t.id));
+
+    return [
+      { type: "section", title: "recommended" },
+      ...recommended.map(toThemeAction),
+      { type: "section", title: "all themes" },
+      ...otherThemes.map(toThemeAction),
+    ];
   }, [cmdKSearchQuery, currentThemeId]);
+
+  useEffect(() => {
+    if (!isThemePickerOpen || !isCmdKMenuOpen) return;
+    const idx = themeSuggestions.findIndex(
+      (s) => s.type === "action" && s.themeId === currentThemeId
+    );
+    if (idx === -1) return;
+    setSelectedCmdKSuggestionIndex(idx);
+    const timer = setTimeout(() => {
+      document.getElementById(`note-list-cmdk-item-${idx}`)?.scrollIntoView({ block: "center" });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isThemePickerOpen, isCmdKMenuOpen, currentThemeId, themeSuggestions]);
 
   const fullTextSearchResults = useMemo<CmdKSuggestion[]>(() => {
     const query = cmdKSearchQuery.trim();
@@ -1451,6 +1553,19 @@ function App() {
   useEffect(() => {
     if (!isCmdKMenuOpen) return;
     const current = cmdKSuggestions[selectedCmdKSuggestionIndex];
+    if (current?.type !== "section" && current?.type !== "noteHeader") return;
+    for (let i = 0; i < cmdKSuggestions.length; i++) {
+      const type = cmdKSuggestions[i].type;
+      if (type !== "section" && type !== "noteHeader") {
+        setSelectedCmdKSuggestionIndex(i);
+        return;
+      }
+    }
+  }, [cmdKSuggestions, isCmdKMenuOpen]);
+
+  useEffect(() => {
+    if (!isCmdKMenuOpen) return;
+    const current = cmdKSuggestions[selectedCmdKSuggestionIndex];
     if (current?.type !== "noteHeader") return;
     for (let i = selectedCmdKSuggestionIndex + 1; i < cmdKSuggestions.length; i++) {
       if (cmdKSuggestions[i].type !== "noteHeader") {
@@ -1546,8 +1661,10 @@ function App() {
 
         let nextIndex: number | null = null;
         const length = cmdKSuggestions.length;
-        const isSelectableIndex = (idx: number): boolean =>
-          cmdKSuggestions[idx]?.type !== "noteHeader";
+        const isSelectableIndex = (idx: number): boolean => {
+          const item = cmdKSuggestions[idx];
+          return item?.type !== "noteHeader" && item?.type !== "section";
+        };
         const stepIndex = (start: number, step: 1 | -1): number => {
           if (length === 0) return 0;
           let idx = start;
@@ -1693,6 +1810,12 @@ function App() {
         setIsHelpMenuOpen(false);
         setIsFullTextSearchMode(true);
         setCmdKSearchQuery("");
+        return;
+      }
+
+      if (e.code === "KeyD" && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault();
+        setIsFocusMode(!isFocusMode);
         return;
       }
 
@@ -2196,6 +2319,13 @@ function App() {
     return trimmed.split(/\s+/).length;
   }, [textValue]);
 
+  const charCount = useMemo(() => textValue.length, [textValue]);
+
+  const readingMinutes = useMemo(() => {
+    if (wordCount === 0) return 0;
+    return Math.max(1, Math.ceil(wordCount / 200));
+  }, [wordCount]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(getCurrentTime());
@@ -2232,6 +2362,7 @@ function App() {
     <>
       {isElectron() && <div className="custom-title-bar" />}
       <main
+        className={isFocusMode ? "focus-mode" : undefined}
         style={{
           ...(isNarrowScreen
             ? {
@@ -2311,7 +2442,9 @@ function App() {
                 <span className="statusbar-dim"> ({currentWorkspace})</span>
               )}
             </span>
-            <span className="statusbar-item statusbar-dim">{wordCount}w</span>
+            <span className="statusbar-item statusbar-dim">
+              {wordCount}w · {charCount}c{wordCount > 0 ? ` · ${readingMinutes}m` : ""}
+            </span>
           </div>
           <div className="statusbar-right">
             {backupStatus !== "idle" && (
@@ -2384,6 +2517,14 @@ function App() {
                     <div className="help-menu-shortcuts-item">
                       <div className="help-menu-shortcuts-keys">
                         <kbd>{cmdKey}</kbd>
+                        <kbd>⇧</kbd>
+                        <kbd>d</kbd>
+                      </div>
+                      <span>Toggle focus mode</span>
+                    </div>
+                    <div className="help-menu-shortcuts-item">
+                      <div className="help-menu-shortcuts-keys">
+                        <kbd>{cmdKey}</kbd>
                         <kbd>h</kbd>
                       </div>
                       <span>Pin note to all workspaces</span>
@@ -2435,14 +2576,15 @@ function App() {
                 </button>
                 <button onClick={() => {
                   setMoreMenuPosition(null);
+                  setIsFocusMode(!isFocusMode);
+                }}>
+                  <span className="more-menu-check">{isFocusMode ? "✓" : ""}</span>
+                  <span className="more-menu-label">focus mode</span>
+                </button>
+                <button onClick={() => {
+                  setMoreMenuPosition(null);
                   setIsCmdKMenuOpen(true);
-                  setIsThemePickerOpen(true);
-                  setCmdKSearchQuery("");
-                  const idx = THEMES.findIndex((t) => t.id === currentThemeId);
-                  setSelectedCmdKSuggestionIndex(idx === -1 ? 0 : idx);
-                  setTimeout(() => {
-                    document.getElementById(`note-list-cmdk-item-${idx}`)?.scrollIntoView({ block: "center" });
-                  });
+                  openThemePicker();
                 }}>
                   <span className="more-menu-check" />
                   <span className="more-menu-label">theme: {currentTheme.name.toLowerCase()}</span>
@@ -2591,6 +2733,14 @@ function App() {
                     </div>
                   )}
                   {cmdKSuggestions.map((suggestion, index) => {
+                    if (suggestion.type === "section") {
+                      return (
+                        <div key={`section-${suggestion.title}-${index}`} className="cmdk-section-label">
+                          {suggestion.title}
+                        </div>
+                      );
+                    }
+
                     if (suggestion.type === "noteHeader") {
                       const note = suggestion.note;
                       const title = getNoteTitle(note).trim() || "New Note";
