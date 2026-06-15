@@ -2501,7 +2501,7 @@ function App() {
                   </button>
                 )}
                 <div className="more-menu-divider" />
-                <a href="https://github.com/shaoruu/typehere.app" target="_blank" rel="noreferrer">
+                <a href="https://github.com/o9ll/typehere" target="_blank" rel="noreferrer">
                   <button>
                     <span className="more-menu-check" />
                     <span className="more-menu-label">github</span>
