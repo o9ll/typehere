@@ -1,4 +1,4 @@
-# Type Here: A Powerful Textarea
+# Type: A Powerful Textarea
 
 A textarea (with vim)
 

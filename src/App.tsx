@@ -9,7 +9,15 @@ import { MdVisibilityOff } from "react-icons/md";
 import { FiMoreHorizontal } from "react-icons/fi";
 import isElectron from "is-electron";
 import type { BackupEntry } from "./electron.d";
-import { THEMES, applyThemeToDocument, restoreThemeFromCache, getThemeById, getRecommendedThemes } from "./themes";
+import {
+  THEMES,
+  DEFAULT_THEME_ID,
+  THEME_STORAGE_KEY,
+  applyThemeToDocument,
+  bootstrapTheme,
+  getThemeById,
+  getRecommendedThemes,
+} from "./themes";
 import { saveAsset, getAsset, generateAssetId, formatImageRef, restoreSerializedAssets, type SerializedAsset, uploadAssetToCloud, downloadAssetFromCloud, type AssetManifestEntry, IMAGE_REF_REGEX } from "./assets";
 import type { Ace } from "ace-builds";
 import { ImageWidgetManager, type ImageSpotlightOpenPayload } from "./imageWidgets";
@@ -485,13 +493,7 @@ const freshDatabase = [
 ];
 
 
-const themeId = "typehere-theme";
-if (!restoreThemeFromCache()) {
-  const legacy = localStorage.getItem(themeId);
-  if (legacy === '"dark"') {
-    document.documentElement.setAttribute("data-theme", "typehere-dark");
-  }
-}
+bootstrapTheme();
 
 const sortNotes = (notes: Note[]) => {
   if (!notes || notes.length === 0) return [];
@@ -781,7 +783,7 @@ function App() {
 
   const fileInputDomRef = useRef<HTMLInputElement>(null);
 
-  const [currentThemeId, setCurrentThemeId] = usePersistentState<string>(themeId, "typehere-dark");
+  const [currentThemeId, setCurrentThemeId] = usePersistentState<string>(THEME_STORAGE_KEY, DEFAULT_THEME_ID);
   const currentTheme = getThemeById(currentThemeId);
   const [selectedCmdKSuggestionIndex, setSelectedCmdKSuggestionIndex] = useState<number>(0);
   const [cmdKSearchQuery, setCmdKSearchQuery] = useState("");
@@ -2154,6 +2156,27 @@ function App() {
 
   const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
   const cmdKey = isMac ? "⌘" : "ctrl";
+  const isWeb = !isElectron();
+  const pageHeaderHeight = isWeb && !isFocusMode ? 32 : 0;
+
+  const openCmdKMenu = () => {
+    setSelectedCmdKSuggestionIndex(0);
+    setIsCmdKMenuOpen(true);
+    setIsHelpMenuOpen(false);
+    setIsFullTextSearchMode(false);
+    setIsThemePickerOpen(false);
+    setCmdKSearchQuery("");
+  };
+
+  useEffect(() => {
+    if (!isWeb) return;
+    document.body.classList.add("web");
+    return () => document.body.classList.remove("web");
+  }, [isWeb]);
+
+  useEffect(() => {
+    document.body.classList.toggle("focus-mode", isFocusMode);
+  }, [isFocusMode]);
 
   const [isBackupListOpen, setIsBackupListOpen] = useState(false);
   const [backupList, setBackupList] = useState<BackupEntry[]>([]);
@@ -2361,6 +2384,18 @@ function App() {
   return (
     <>
       {isElectron() && <div className="custom-title-bar" />}
+      {isWeb && (
+        <header className="page-header" aria-label="Page header">
+          <button type="button" className="page-header-brand" onClick={openCmdKMenu}>
+            Type
+          </button>
+          <button type="button" className="page-header-hint" onClick={openCmdKMenu} title="Open command menu">
+            <kbd>{cmdKey}</kbd>
+            <kbd>K</kbd>
+            <span className="page-header-hint-label">menu</span>
+          </button>
+        </header>
+      )}
       <main
         className={isFocusMode ? "focus-mode" : undefined}
         style={{
@@ -2375,7 +2410,9 @@ function App() {
         <div
           style={{
             width: "100%",
-            height: isElectron() ? "calc(100vh - 28px)" : "100vh",
+            height: isElectron()
+              ? "calc(100vh - 28px)"
+              : `calc(100vh - ${pageHeaderHeight}px)`,
             paddingLeft: isNarrowScreen ? 0 : 36,
             paddingRight: shouldShowScrollbar ? 0 : isNarrowScreen ? 0 : 36,
             position: "relative",
@@ -2431,7 +2468,7 @@ function App() {
               background: "var(--note-background-color)",
               color: "var(--dark-color)",
             }}
-            placeholder="Type here..."
+            placeholder="Type..."
           />
         </div>
         <div id="controls">

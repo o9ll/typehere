@@ -1,6 +1,6 @@
 {
-  "name": "typehere",
-  "productName": "Type Here",
+  "name": "type",
+  "productName": "Type",
   "description": "A textarea with vim (and more).",
   "author": "Shaoru Ian Huang",
   "private": true,
@@ -13,7 +13,7 @@
     }
   },
   "build": {
-    "appId": "com.typehere.o9",
+    "appId": "com.type.o9",
     "asar": true,
     "directories": {
       "output": "release/${version}"

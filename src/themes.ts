@@ -6,7 +6,7 @@ type Theme = {
 };
 
 const THEMES: Theme[] = [
-  { id: "typehere-dark", name: "Type Here", isDark: true, accentColor: "#a78bfa" },
+  { id: "typehere-dark", name: "Type", isDark: true, accentColor: "#a78bfa" },
   { id: "light", name: "Light", isDark: false, accentColor: "#666666" },
   { id: "paper", name: "Paper", isDark: false, accentColor: "#7a6e61" },
   { id: "sepia", name: "Sepia", isDark: false, accentColor: "#7a6b57" },
@@ -461,6 +461,35 @@ function applyThemeToDocument(theme: Theme, isPreview = false): void {
   }
 }
 
+const DEFAULT_THEME_ID = "typehere-dark";
+const THEME_STORAGE_KEY = "typehere-theme";
+
+function resolveInitialThemeId(): string {
+  try {
+    const cached = localStorage.getItem("typehere-theme-cache");
+    if (cached) {
+      if (cached.startsWith("{")) {
+        const parsed = JSON.parse(cached) as { id: string };
+        if (parsed.id) return parsed.id;
+      } else {
+        return cached;
+      }
+    }
+
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as string;
+      if (typeof parsed === "string" && parsed.length > 0) return parsed;
+    }
+  } catch {}
+
+  return DEFAULT_THEME_ID;
+}
+
+function bootstrapTheme(): void {
+  document.documentElement.setAttribute("data-theme", resolveInitialThemeId());
+}
+
 function restoreThemeFromCache(): boolean {
   try {
     const cached = localStorage.getItem("typehere-theme-cache");
@@ -501,4 +530,14 @@ function getRecommendedThemes(): Theme[] {
 }
 
 export type { Theme };
-export { THEMES, RECOMMENDED_THEME_IDS, applyThemeToDocument, restoreThemeFromCache, getThemeById, getRecommendedThemes };
+export {
+  THEMES,
+  DEFAULT_THEME_ID,
+  THEME_STORAGE_KEY,
+  RECOMMENDED_THEME_IDS,
+  applyThemeToDocument,
+  bootstrapTheme,
+  restoreThemeFromCache,
+  getThemeById,
+  getRecommendedThemes,
+};

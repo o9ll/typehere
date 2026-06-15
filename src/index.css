@@ -7,6 +7,13 @@
   font-family: 'Berkeley Mono', 'JetBrains Mono', monospace;
 }
 
+html,
+body,
+#root {
+  background: var(--note-background-color);
+  min-height: 100%;
+}
+
 .ace_comment,
 .ace_placeholder {
   font-family: 'Berkeley Mono', 'JetBrains Mono', monospace !important;
@@ -46,6 +53,7 @@
 }
 
 :root[data-theme='typehere-dark'] {
+  color-scheme: dark;
   --border-color: #2a2a2e;
   --hover-background-color: #1f1f23;
   --note-background-color: #09090b;
@@ -9688,6 +9696,80 @@ input {
   border-top: 1px solid color-mix(in srgb, var(--dark-color) 6%, transparent);
   z-index: 12;
   -webkit-app-region: no-drag;
+}
+
+.page-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--note-background-color) 92%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--dark-color) 6%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.page-header-brand,
+.page-header-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--dark-color) 72%, transparent);
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.page-header-brand {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.page-header-brand:hover,
+.page-header-hint:hover {
+  background: color-mix(in srgb, var(--dark-color) 6%, transparent);
+  color: var(--dark-color);
+}
+
+.page-header-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--dark-color) 12%, transparent);
+  background: color-mix(in srgb, var(--dark-color) 5%, var(--note-background-color));
+  font-size: 0.64rem;
+  line-height: 1.2;
+}
+
+.page-header-hint-label {
+  margin-left: 2px;
+  opacity: 0.55;
+}
+
+body.web.focus-mode .page-header {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+}
+
+@media (max-width: 520px) {
+  .page-header-hint-label {
+    display: none;
+  }
 }
 
 #controls .statusbar-left,

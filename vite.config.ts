@@ -34,9 +34,9 @@ export default defineConfig({
         display: 'standalone',
         scope: base,
         start_url: base,
-        short_name: 'Type Here | App',
-        description: 'Type here...',
-        name: 'Type Here | App',
+        short_name: 'Type',
+        description: 'Type...',
+        name: 'Type',
         icons: [
           {
             src: `${base}icon-256x256.png`,

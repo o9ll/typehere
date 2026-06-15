@@ -1,8 +1,11 @@
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import { NextAnalytics } from './Analytics.tsx';
+import { bootstrapTheme } from './themes';
 
 import './index.css';
+
+bootstrapTheme();
 
 import 'ace-builds/src-noconflict/ace';
 import 'ace-builds/src-noconflict/ext-language_tools';
